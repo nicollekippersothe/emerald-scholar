@@ -27,6 +27,7 @@ import {
   BarChart3,
   Link2,
 } from "lucide-react";
+import PlansModal from "@/components/PlansModal";
 import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS } from "@/data/mockDatabase";
 
 const SC_BADGES = [
