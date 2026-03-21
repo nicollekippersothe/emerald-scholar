@@ -1,88 +1,25 @@
 import { useState, type FormEvent } from "react";
 import {
-  Search,
   BookOpen,
-  Clock,
   BrainCircuit,
-  Target,
-  Lightbulb,
-  Bot,
-  Zap,
-  BotMessageSquare,
   ArrowRight,
+  BotMessageSquare,
+  Bot,
+  X,
+  Search,
+  Database,
+  BarChart3,
+  Gauge,
+  FileText,
+  Link2,
+  FileSearch,
+  Sparkles,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
-
-// ── MOCK DB ──
-const MOCK_DB = [
-  {
-    keywords: ["retinol","linhas finas","adultos","envelhecimento"],
-    count: 22,
-    articles: [
-      { title:"Retinoids in skin aging: an overview", authors:"Kafi, R., et al.", year:"2022", journal:"Clinical Interventions in Aging", source:"PubMed", evidence_score:5, study_type:"revisão sistemática", abstract_pt:"Meta-análise de 31 ECRs demonstrando que retinol 0,1% a 1% reduz significativamente linhas finas após 12 semanas." },
-    ],
-    synthesis: { direct_answer:"Sim, o retinol tópico reduz linhas finas e melhora a textura da pele em adultos de forma significativa, com efeito dose-dependente após 12-24 semanas de uso.", consensus_agree:82, consensus_inconclusive:12, consensus_contradict:6, confidence_level:"alta", practical_insight:"Retinol 0,3%-0,5% à noite é o protocolo mais comum nos estudos.", search_tip:"Tente 'retinol e fotoproteção diária'." },
-  },
-  {
-    keywords: ["exercício aeróbico","melhora","depressão clínica"],
-    count: 18,
-    articles: [
-      { title:"Exercise as a treatment for depression", authors:"Blumenthal, J. A., et al.", year:"2023", journal:"JAMA Psychiatry", source:"PubMed", evidence_score:5, study_type:"meta-análise", abstract_pt:"Esta meta-análise avaliou 45 ensaios clínicos, mostrando que exercício de intensidade moderada reduz sintomas depressivos de forma comparável a antidepressivos." },
-    ],
-    synthesis: { direct_answer:"Com base em 18 estudos analisados, o exercício aeróbico reduz significativamente os sintomas da depressão clínica, com eficácia comparável aos antidepressivos em casos leves.", consensus_agree:78, consensus_inconclusive:15, consensus_contradict:7, confidence_level:"alta", practical_insight:"30 min de aeróbico 3x/semana mostram benefícios mensuráveis.", search_tip:"Busque por 'modalidade do exercício e saúde mental'." },
-  },
-  {
-    keywords: ["sono fragmentado","aumenta","risco de alzheimer"],
-    count: 14,
-    articles: [
-      { title:"Sleep fragmentation and risk of Alzheimer's", authors:"Lucey, B. P., et al.", year:"2023", journal:"Nature Medicine", source:"PubMed", evidence_score:3, study_type:"coorte", abstract_pt:"Estudo de coorte com 4.417 adultos mostrou que fragmentação severa do sono elevou em 1.68x o risco de Alzheimer." },
-    ],
-    synthesis: { direct_answer:"A fragmentação do sono está consistentemente associada ao aumento do risco de Alzheimer, sugerindo acúmulo de β-amiloide durante o sono interrompido.", consensus_agree:71, consensus_inconclusive:22, consensus_contradict:7, confidence_level:"média", practical_insight:"Manter 7-9h de sono consolidado pode ser uma estratégia preventiva.", search_tip:"Busque por 'sono de ondas lentas e Alzheimer'." },
-  },
-  {
-    keywords: ["meditação mindfulness","reduz","ansiedade"],
-    count: 19,
-    articles: [
-      { title:"MBSR and anxiety: a meta-analysis", authors:"Hofmann, S. G., et al.", year:"2022", journal:"J. Consult Clin Psychol", source:"Semantic Scholar", evidence_score:5, study_type:"meta-análise", abstract_pt:"Meta-análise de 39 estudos avaliando MBSR e MBCT mostrou efeito moderado-grande na redução de ansiedade." },
-    ],
-    synthesis: { direct_answer:"A meditação mindfulness (especialmente MBSR e MBCT) reduz sintomas de ansiedade com magnitude de efeito moderada.", consensus_agree:74, consensus_inconclusive:19, consensus_contradict:7, confidence_level:"alta", practical_insight:"MBSR de 8 semanas é o protocolo com maior evidência.", search_tip:"Refine para 'formato presencial vs app'." },
-  },
-  {
-    keywords: ["probióticos","melhoram","saúde intestinal"],
-    count: 16,
-    articles: [
-      { title:"Probiotics for GI disorders: systematic review", authors:"Ford, A. C., et al.", year:"2022", journal:"Gut", source:"PubMed", evidence_score:5, study_type:"meta-análise", abstract_pt:"Meta-análise de 53 ECRs mostrou que probióticos multiestirpe reduziram sintomas de SII (RR=0.79)." },
-    ],
-    synthesis: { direct_answer:"Probióticos demonstram benefícios consistentes em condições gastrointestinais específicas, principalmente diarreia associada a antibióticos e SII.", consensus_agree:68, consensus_inconclusive:24, consensus_contradict:8, confidence_level:"média", practical_insight:"Cepas como L. rhamnosus GG e S. boulardii têm mais evidência.", search_tip:"Busque por 'cepas específicas probióticos'." },
-  },
-];
-
-interface ArticleData {
-  title: string;
-  authors: string;
-  year: string;
-  journal: string;
-  source: string;
-  evidence_score: number;
-  study_type: string;
-  abstract_pt: string;
-}
-
-interface SynthesisData {
-  direct_answer: string;
-  consensus_agree: number;
-  consensus_inconclusive: number;
-  consensus_contradict: number;
-  confidence_level: string;
-  practical_insight: string;
-  search_tip: string;
-}
-
-interface MockEntry {
-  keywords: string[];
-  count: number;
-  articles: ArticleData[];
-  synthesis: SynthesisData;
-}
+import { findMatch, type MockEntry } from "@/data/mockDatabase";
+import ResultsView from "@/components/ResultsView";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -102,6 +39,15 @@ const QUICK_SEARCHES = [
   "probióticos melhoram saúde intestinal?",
 ];
 
+const FEATURES = [
+  { icon: Database, title: "7 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO e arXiv." },
+  { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
+  { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
+  { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
+  { icon: Link2, title: "DOI verificável", desc: "Link direto para o artigo oficial antes de citar." },
+  { icon: FileSearch, title: "Dissecar PDF", desc: "Envie qualquer artigo e receba objetivo, amostra, p-valor e limitações." },
+];
+
 const Index = () => {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<MockEntry | null>(null);
@@ -113,14 +59,7 @@ const Index = () => {
     setLoading(true);
     setQuery(searchTerm);
     setTimeout(() => {
-      const ql = searchTerm.toLowerCase();
-      const match = MOCK_DB.find(
-        (m) =>
-          m.keywords.some((k) => ql.includes(k)) ||
-          ql.includes(m.keywords[0]) ||
-          m.keywords.every((k) => ql.includes(k))
-      );
-      setResult(match || null);
+      setResult(findMatch(searchTerm));
       setLoading(false);
       setSearchesLeft((prev) => Math.max(0, prev - 1));
     }, 1200);
@@ -136,13 +75,28 @@ const Index = () => {
     setQuery("");
   };
 
+  // ── RESULTS VIEW ──
+  if (result && !loading) {
+    return (
+      <ResultsView
+        query={query}
+        result={result}
+        searchesLeft={searchesLeft}
+        onQueryChange={setQuery}
+        onSubmit={handleSubmit}
+        onSearch={handleSearch}
+        onBack={handleBack}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground relative">
+    <div className="min-h-screen bg-background font-sans text-foreground">
       {/* HEADER */}
-      <header className="flex items-center justify-between p-4 border-b border-foreground/10">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-foreground/10">
         <div className="flex items-center gap-3">
           <BrainCircuit className="text-primary size-6" />
-          <button onClick={handleBack} className="flex items-center gap-0">
+          <button onClick={handleBack} className="flex items-center">
             <h1 className="text-xl font-extrabold tracking-tight">
               Scholar<span className="text-primary">IA</span>
             </h1>
@@ -152,245 +106,223 @@ const Index = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="bg-card/50 border border-foreground/10 text-primary px-4 py-1.5 rounded-xl text-sm font-semibold">
+          <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes
           </div>
-          <button className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+          <button className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
             Planos
           </button>
         </div>
       </header>
 
-      {/* MAIN */}
-      <main className="max-w-4xl mx-auto px-6 py-12 flex flex-col items-center">
-        {/* LANDING STATE */}
-        {!result && !loading && (
-          <div className="w-full text-center flex flex-col items-center">
-            <div className="bg-foreground/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 mb-6 border border-foreground/5">
-              <BookOpen size={16} /> PARA PESQUISA ACADÊMICA
-            </div>
+      {/* HERO SECTION */}
+      <main className="flex flex-col items-center">
+        <section className="w-full bg-gradient-to-b from-background via-background to-background/80 px-6 pt-16 pb-12 flex flex-col items-center">
+          <div className="bg-foreground/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 mb-6 border border-foreground/5">
+            <BookOpen size={16} /> PARA PESQUISA ACADÊMICA
+          </div>
 
-            <h2 className="text-4xl md:text-5xl font-extrabold text-foreground mb-4 leading-tight">
-              Seu assistente de <br />
-              <span className="text-primary">pesquisa científica</span>
-            </h2>
+          <h2 className="text-4xl md:text-5xl font-extrabold text-foreground mb-4 leading-tight text-center">
+            Seu assistente de <br />
+            <span className="text-primary italic">pesquisa científica</span>
+          </h2>
 
-            <p className="text-secondary-foreground text-lg mb-12 max-w-2xl">
-              Busca em 7 bases simultâneas, filtra os artigos revisados por
-              especialistas e mostra o nível de confiabilidade de cada fonte.
-            </p>
+          <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
+            Busca em 7 bases simultâneas, filtra os artigos revisados por
+            especialistas e mostra o nível de confiabilidade de cada fonte.
+          </p>
 
-            {/* SEARCH BAR */}
-            <form onSubmit={handleSubmit} className="relative w-full mb-16">
+          {/* SEARCH CARD */}
+          <form
+            onSubmit={handleSubmit}
+            className="w-full max-w-2xl bg-card/60 border border-foreground/10 rounded-2xl p-5 mb-6 shadow-2xl"
+          >
+            <div className="relative mb-3">
+              <BrainCircuit className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={'"retinol reduz linhas finas?" ou "sono causa Alzheimer?"'}
-                className="w-full p-5 sm:p-6 pl-14 sm:pl-16 pr-4 sm:pr-52 rounded-full bg-card/40 border border-foreground/10 text-base sm:text-lg placeholder:text-muted-foreground focus:ring-2 focus:ring-primary outline-none transition-shadow"
+                placeholder="existe telepatia?"
+                className="w-full py-3 pl-12 pr-10 rounded-xl bg-background/50 border border-foreground/10 text-base placeholder:text-muted-foreground focus:ring-2 focus:ring-primary outline-none"
               />
-              <BrainCircuit className="absolute left-5 sm:left-6 top-5 sm:top-6 text-muted-foreground" size={22} />
-              <button
-                type="submit"
-                className="sm:absolute sm:right-3 sm:top-3 mt-3 sm:mt-0 w-full sm:w-auto bg-primary text-primary-foreground px-6 sm:px-8 py-3 rounded-full font-bold text-base hover:brightness-110 active:scale-[0.97] transition-all flex items-center justify-center gap-2"
-              >
-                Buscar e analisar <ArrowRight size={18} />
-              </button>
-            </form>
-
-            {/* Info */}
-            <div className="flex items-center gap-6 text-sm text-muted-foreground mb-8">
-              <span>{searchesLeft} buscas gratuitas, sem cadastro</span>
-              <button className="flex items-center gap-2 hover:text-foreground transition-colors">
-                <BotMessageSquare size={16} /> Analisar um PDF
-              </button>
-            </div>
-
-            {/* SOURCE BADGES */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-10 max-w-2xl">
-              {SC_BADGES.map((sc) => (
-                <span
-                  key={sc.name}
-                  style={{
-                    backgroundColor: `${sc.color}15`,
-                    color: sc.color,
-                    borderColor: `${sc.color}30`,
-                  }}
-                  className="px-3 py-1 rounded-full text-xs font-semibold border"
-                >
-                  {sc.name}
-                </span>
-              ))}
-            </div>
-
-            {/* QUICK SEARCHES */}
-            <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl">
-              {QUICK_SEARCHES.map((search) => (
+              {query && (
                 <button
-                  key={search}
-                  onClick={() => handleSearch(search)}
-                  className="bg-card/50 border border-foreground/5 hover:border-primary/30 px-5 py-2.5 rounded-full text-sm text-secondary-foreground hover:text-foreground transition-colors"
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {search}
+                  <X size={18} />
                 </button>
-              ))}
+              )}
             </div>
-          </div>
+            <button
+              type="submit"
+              className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-bold text-base hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              Buscar e analisar <ArrowRight size={18} />
+            </button>
+          </form>
+
+          {/* LOADING */}
+          {loading && (
+            <div className="text-center py-12 flex flex-col items-center gap-4 text-primary font-bold animate-pulse text-xl">
+              <BrainCircuit className="size-12 animate-spin" />
+              Analisando bases científicas...
+            </div>
+          )}
+
+          {/* Info line */}
+          {!loading && (
+            <>
+              <div className="flex items-center gap-6 text-sm text-muted-foreground mb-8">
+                <span>{searchesLeft} buscas gratuitas, sem cadastro</span>
+                <button className="flex items-center gap-2 hover:text-foreground transition-colors">
+                  <BotMessageSquare size={16} /> Analisar um PDF
+                </button>
+              </div>
+
+              {/* SOURCE BADGES */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-8 max-w-2xl">
+                {SC_BADGES.map((sc) => (
+                  <span
+                    key={sc.name}
+                    style={{
+                      backgroundColor: `${sc.color}15`,
+                      color: sc.color,
+                      borderColor: `${sc.color}30`,
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-semibold border"
+                  >
+                    {sc.name}
+                  </span>
+                ))}
+              </div>
+
+              {/* QUICK SEARCHES */}
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl">
+                {QUICK_SEARCHES.map((search) => (
+                  <button
+                    key={search}
+                    onClick={() => handleSearch(search)}
+                    className="bg-card/50 border border-foreground/10 hover:border-primary/30 px-5 py-2.5 rounded-full text-sm text-foreground/70 hover:text-foreground transition-colors"
+                  >
+                    {search}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* FEATURES SECTION */}
+        {!loading && (
+          <section className="w-full bg-foreground/[0.03] border-t border-foreground/5 px-6 py-20">
+            <div className="max-w-5xl mx-auto">
+              <h3 className="text-2xl md:text-3xl font-extrabold text-foreground text-center mb-3">
+                Uma ferramenta feita para quem pesquisa de verdade
+              </h3>
+              <p className="text-foreground/60 text-center mb-12 max-w-xl mx-auto">
+                Cada resultado vem com contexto suficiente para você avaliar, citar e
+                seguir em frente.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {FEATURES.map((f, i) => (
+                  <div
+                    key={f.title}
+                    className={`bg-card/40 border border-foreground/5 rounded-2xl p-5 hover:border-primary/20 transition-colors ${
+                      i >= 4 ? "sm:col-span-1" : ""
+                    }`}
+                  >
+                    <f.icon className="text-primary mb-3" size={22} />
+                    <h4 className="font-bold text-foreground text-sm mb-1">{f.title}</h4>
+                    <p className="text-foreground/50 text-xs leading-relaxed">{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* LOADING */}
-        {loading && (
-          <div className="text-center py-24 flex flex-col items-center gap-4 text-primary font-bold animate-pulse text-xl">
-            <BrainCircuit className="size-12 animate-spin" />
-            Analisando bases científicas...
-          </div>
-        )}
-
-        {/* RESULTS */}
-        {result && !loading && (
-          <div className="w-full space-y-8 animate-fade-up">
-            {/* Mini search bar at top */}
-            <form onSubmit={handleSubmit} className="relative w-full">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full p-4 pl-12 pr-32 rounded-full bg-card/40 border border-foreground/10 text-base placeholder:text-muted-foreground focus:ring-2 focus:ring-primary outline-none"
-              />
-              <Search className="absolute left-4 top-4 text-muted-foreground" size={20} />
+        {/* CTA SECTION */}
+        {!loading && (
+          <section className="w-full bg-gradient-to-b from-background to-background px-6 py-16">
+            <div className="max-w-md mx-auto text-center">
+              <h3 className="text-2xl font-extrabold text-foreground italic mb-3">
+                Comece agora
+              </h3>
+              <p className="text-muted-foreground text-sm mb-6">
+                3 buscas gratuitas. Sem cadastro.
+              </p>
               <button
-                type="submit"
-                className="absolute right-2 top-2 bg-primary text-primary-foreground px-6 py-2 rounded-full font-bold text-sm hover:brightness-110 active:scale-[0.97] transition-all"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-bold hover:brightness-110 active:scale-[0.97] transition-all inline-flex items-center gap-2"
               >
-                Buscar
+                Buscar artigos <ArrowRight size={18} />
               </button>
-            </form>
-
-            {/* SYNTHESIS PANEL */}
-            <div className="bg-card/60 rounded-3xl p-6 sm:p-8 border border-foreground/5 shadow-2xl">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-                <div>
-                  <h3 className="text-xl font-bold text-foreground mb-1">
-                    "{query}"
-                  </h3>
-                  <div className="text-sm font-semibold text-primary flex items-center gap-1.5">
-                    <Target size={15} /> Interpretação baseada em{" "}
-                    {result.count} estudos científicos
-                  </div>
-                </div>
-                <span
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase shrink-0 ${
-                    result.synthesis.confidence_level === "alta"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-orange-500/20 text-orange-400"
-                  }`}
-                >
-                  Confiança {result.synthesis.confidence_level}
-                </span>
-              </div>
-
-              {/* Direct answer */}
-              <div className="p-5 sm:p-6 bg-foreground/5 rounded-2xl border border-foreground/10 mb-8">
-                <p className="text-base text-foreground/90 italic leading-relaxed">
-                  "{result.synthesis.direct_answer}"
-                </p>
-              </div>
-
-              {/* Consensus metrics */}
-              <div className="space-y-3 mb-8">
-                <h4 className="text-sm font-semibold text-muted-foreground">
-                  Consenso da Literatura
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-4 bg-foreground/5 rounded-xl border border-foreground/10">
-                    <div className="text-3xl font-black text-emerald-400">
-                      {result.synthesis.consensus_agree}%
-                    </div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Concordam
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-foreground/5 rounded-xl border border-foreground/10">
-                    <div className="text-3xl font-black text-amber-400">
-                      {result.synthesis.consensus_inconclusive}%
-                    </div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Inconclusivo
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-foreground/5 rounded-xl border border-foreground/10">
-                    <div className="text-3xl font-black text-rose-400">
-                      {result.synthesis.consensus_contradict}%
-                    </div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Contradizem
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Insights */}
-              <div className="space-y-3 border-t border-foreground/10 pt-6">
-                <div className="flex items-start gap-3 text-sm">
-                  <Lightbulb
-                    className="text-primary shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <p>
-                    <strong className="text-foreground">
-                      Insight Prático:
-                    </strong>{" "}
-                    <span className="text-secondary-foreground">
-                      {result.synthesis.practical_insight}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex items-start gap-3 text-sm">
-                  <Zap
-                    className="text-muted-foreground shrink-0 mt-0.5"
-                    size={18}
-                  />
-                  <p>
-                    <strong className="text-muted-foreground">
-                      Dica de Busca:
-                    </strong>{" "}
-                    <span className="text-muted-foreground">
-                      {result.synthesis.search_tip}
-                    </span>
-                  </p>
-                </div>
-              </div>
             </div>
+          </section>
+        )}
 
-            {/* ARTICLES */}
-            <div className="space-y-4">
-              {result.articles.map((art, i) => (
-                <div
-                  key={i}
-                  className="bg-card/40 p-6 rounded-2xl border border-foreground/5 hover:border-primary/20 transition-all duration-300"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase border border-primary/20">
-                      {art.study_type}
-                    </span>
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <Zap size={13} /> {art.source}
-                      <Clock size={13} /> {art.year}
-                    </div>
-                  </div>
-                  <h4 className="font-bold text-foreground text-lg leading-tight mb-2">
-                    {art.title}
+        {/* SPLIT PDF SECTION */}
+        {!loading && (
+          <section className="w-full px-6 pb-20">
+            <div className="max-w-5xl mx-auto">
+              <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-0">
+                {/* Left */}
+                <div className="p-8 md:p-10">
+                  <span className="bg-primary/20 text-primary px-3 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 mb-4">
+                    <FileSearch size={14} /> SPLIT PDF
+                  </span>
+                  <h4 className="text-2xl font-extrabold text-white mb-1">
+                    Já tem um artigo
                   </h4>
-                  <p className="text-sm text-muted-foreground mb-5">
-                    {art.authors} • {art.journal}
+                  <h4 className="text-2xl font-extrabold text-primary italic mb-4">
+                    em mãos?
+                  </h4>
+                  <p className="text-white/70 text-sm leading-relaxed mb-6">
+                    Envie o PDF e a IA divide em blocos de fatos puros: objetivo,
+                    amostra, resultado principal, p-valor, conflito de interesse e
+                    limitações até as que os autores não declararam.
                   </p>
-                  <div className="bg-background/60 p-5 rounded-xl text-sm text-foreground/80 italic border border-foreground/5 leading-relaxed">
-                    "{art.abstract_pt}"
+                  <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold text-sm hover:brightness-110 active:scale-[0.97] transition-all inline-flex items-center gap-2">
+                    Dissecar artigo <ArrowRight size={16} />
+                  </button>
+                </div>
+                {/* Right */}
+                <div className="p-8 md:p-10 flex flex-col justify-center gap-6">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="text-primary shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <h5 className="font-bold text-white text-sm">Resultado principal</h5>
+                      <p className="text-white/50 text-xs">
+                        O que foi encontrado, se é estatisticamente significativo (p-valor) e o tamanho real do efeito.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <h5 className="font-bold text-white text-sm">Limitações não declaradas</h5>
+                      <p className="text-white/50 text-xs">
+                        Problemas que os próprios autores não mencionaram.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <h5 className="font-bold text-white text-sm">Financiamento e viés</h5>
+                      <p className="text-white/50 text-xs">
+                        Quem financiou o estudo? Há conflito de interesse?
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          </section>
         )}
       </main>
 
