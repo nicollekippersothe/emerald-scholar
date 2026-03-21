@@ -120,6 +120,8 @@ const Index = () => {
         </div>
       </header>
 
+      <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
         <section className="w-full bg-gradient-to-b from-background via-background to-background/80 px-6 pt-16 pb-12 flex flex-col items-center">
