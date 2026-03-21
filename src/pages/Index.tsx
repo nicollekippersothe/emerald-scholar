@@ -109,7 +109,10 @@ const Index = () => {
           <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes
           </div>
-          <button className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
+          <button
+            onClick={() => setShowPlans(true)}
+            className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+          >
             Planos
           </button>
         </div>
