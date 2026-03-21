@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { findMatch, type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
+import PlansModal from "@/components/PlansModal";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
