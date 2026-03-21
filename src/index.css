@@ -8,57 +8,43 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 210 20% 97%;
-    --foreground: 215 25% 15%;
+    --background: 160 82% 13%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card: 220 47% 11%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover: 220 47% 11%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 160 84% 28%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 155 80% 67%;
+    --primary-foreground: 160 82% 13%;
 
-    --secondary: 215 16% 93%;
-    --secondary-foreground: 215 25% 15%;
+    --secondary: 220 47% 11%;
+    --secondary-foreground: 210 20% 90%;
 
-    --muted: 210 14% 94%;
-    --muted-foreground: 215 13% 45%;
+    --muted: 220 20% 20%;
+    --muted-foreground: 215 15% 65%;
 
-    --accent: 160 84% 28%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 155 80% 67%;
+    --accent-foreground: 160 82% 13%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 160 84% 28%;
+    --border: 0 0% 100% / 0.1;
+    --input: 0 0% 100% / 0.1;
+    --ring: 155 80% 67%;
 
     --radius: 0.75rem;
 
-    --consensus-bg-from: 160 50% 14%;
-    --consensus-bg-to: 170 45% 16%;
-    --consensus-accent: 160 70% 50%;
-    --consensus-text: 160 60% 92%;
+    --mint: 152 86% 86%;
+    --mint-foreground: 160 82% 13%;
 
-    --score-strong: 160 76% 36%;
-    --score-good: 174 72% 30%;
-    --score-moderate: 217 91% 60%;
-    --score-limited: 38 92% 50%;
-    --score-weak: 220 9% 66%;
-
-    --warn-bg: 48 96% 95%;
-    --warn-border: 48 96% 80%;
-    --warn-text: 32 95% 30%;
-
-    --success-bg: 152 81% 95%;
-    --success-border: 152 81% 75%;
-    --success-text: 160 76% 20%;
-
-    --chat-user-bg: 160 50% 94%;
-    --chat-ai-bg: 215 16% 96%;
+    --consensus-panel: 220 47% 11% / 0.6;
+    --consensus-accent: 142 71% 45%;
+    --consensus-amber: 38 92% 50%;
+    --consensus-rose: 0 84% 60%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -79,8 +65,8 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
   }
 }
