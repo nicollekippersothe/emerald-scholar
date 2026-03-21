@@ -48,12 +48,6 @@ const TABS = [
   { id: "split", label: "Split PDF", icon: FileSearch, count: null },
 ];
 
-const PLANS = [
-  { name: "Gratuito", price: "R$ 0", period: "/mês", features: ["3 buscas/dia", "Resumo básico", "Referência ABNT", "1 base de dados"], cta: "Plano atual", disabled: true, code: "" },
-  { name: "Estudante", price: "R$ 29", period: "/mês", features: ["30 buscas/dia", "Consenso completo", "ABNT + APA + Vancouver", "7 bases simultâneas", "Split PDF (5/mês)", "Exportar referências"], cta: "Assinar Estudante", disabled: false, code: "SCHOLAR-EST-2024", highlight: false },
-  { name: "Pesquisador", price: "R$ 59", period: "/mês", features: ["Buscas ilimitadas", "Todas as análises", "Todos os formatos de ref.", "7 bases + arXiv preprints", "Split PDF ilimitado", "Auditoria de fontes", "API de integração", "Suporte prioritário"], cta: "Assinar Pesquisador", disabled: false, code: "SCHOLAR-PRO-2024", highlight: true },
-  { name: "Institucional", price: "R$ 199", period: "/mês", features: ["Até 20 usuários", "Tudo do Pesquisador", "Dashboard admin", "Relatórios de uso", "SSO institucional", "Faturamento por CNPJ"], cta: "Falar com vendas", disabled: false, code: "SCHOLAR-INST-2024", highlight: false },
-];
 
 const VERIFICATION_STEPS = [
   { n: 1, icon: "🔗", title: "Acesse o DOI ou link do artigo", desc: "Confirme que o artigo existe e que título, autores e ano batem com o que aparece aqui. DOIs falsos ou incorretos são um dos erros mais comuns de IA." },
