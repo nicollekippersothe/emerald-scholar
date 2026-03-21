@@ -43,6 +43,23 @@ All colors MUST be HSL.
     --consensus-accent: 160 70% 50%;
     --consensus-text: 160 60% 92%;
 
+    --score-strong: 160 76% 36%;
+    --score-good: 174 72% 30%;
+    --score-moderate: 217 91% 60%;
+    --score-limited: 38 92% 50%;
+    --score-weak: 220 9% 66%;
+
+    --warn-bg: 48 96% 95%;
+    --warn-border: 48 96% 80%;
+    --warn-text: 32 95% 30%;
+
+    --success-bg: 152 81% 95%;
+    --success-border: 152 81% 75%;
+    --success-text: 160 76% 20%;
+
+    --chat-user-bg: 160 50% 94%;
+    --chat-ai-bg: 215 16% 96%;
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
