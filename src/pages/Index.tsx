@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { findMatch, type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
+import PlansModal from "@/components/PlansModal";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -53,6 +54,7 @@ const Index = () => {
   const [result, setResult] = useState<MockEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchesLeft, setSearchesLeft] = useState(3);
+  const [showPlans, setShowPlans] = useState(false);
 
   const handleSearch = (searchTerm: string) => {
     if (!searchTerm.trim()) return;
@@ -109,11 +111,16 @@ const Index = () => {
           <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes
           </div>
-          <button className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
+          <button
+            onClick={() => setShowPlans(true)}
+            className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+          >
             Planos
           </button>
         </div>
       </header>
+
+      <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
 
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
