@@ -53,6 +53,7 @@ const Index = () => {
   const [result, setResult] = useState<MockEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchesLeft, setSearchesLeft] = useState(3);
+  const [showPlans, setShowPlans] = useState(false);
 
   const handleSearch = (searchTerm: string) => {
     if (!searchTerm.trim()) return;
