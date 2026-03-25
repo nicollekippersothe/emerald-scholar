@@ -30,6 +30,10 @@ const SC_BADGES = [
   { name: "DOAJ", color: "#38BDF8" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
+  { name: "Europe PMC", color: "#E11D48" },
+  { name: "BASE", color: "#8B5CF6" },
+  { name: "Lens.org", color: "#06B6D4" },
+  { name: "CORE", color: "#D97706" },
 ];
 
 const QUICK_SEARCHES = [
