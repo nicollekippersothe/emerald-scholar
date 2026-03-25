@@ -46,7 +46,7 @@ const QUICK_SEARCHES = [
 ];
 
 const FEATURES = [
-  { icon: Database, title: "7 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO e arXiv." },
+  { icon: Database, title: "11 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO, arXiv, Europe PMC, BASE, Lens.org e CORE." },
   { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
   { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
   { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
