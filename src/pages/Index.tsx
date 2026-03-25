@@ -30,6 +30,10 @@ const SC_BADGES = [
   { name: "DOAJ", color: "#38BDF8" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
+  { name: "Europe PMC", color: "#E11D48" },
+  { name: "BASE", color: "#8B5CF6" },
+  { name: "Lens.org", color: "#06B6D4" },
+  { name: "CORE", color: "#D97706" },
 ];
 
 const QUICK_SEARCHES = [
@@ -38,10 +42,11 @@ const QUICK_SEARCHES = [
   "sono fragmentado aumenta risco de Alzheimer?",
   "meditação mindfulness reduz ansiedade?",
   "probióticos melhoram saúde intestinal?",
+  "redes sociais causam vício em dopamina?",
 ];
 
 const FEATURES = [
-  { icon: Database, title: "7 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO e arXiv." },
+  { icon: Database, title: "11 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO, arXiv, Europe PMC, BASE, Lens.org e CORE." },
   { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
   { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
   { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
@@ -135,7 +140,7 @@ const Index = () => {
           </h2>
 
           <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
-            Busca em 7 bases simultâneas, filtra os artigos revisados por
+            Busca em 11 bases simultâneas, filtra os artigos revisados por
             especialistas e mostra o nível de confiabilidade de cada fonte.
           </p>
 
