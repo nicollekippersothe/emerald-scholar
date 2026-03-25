@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useState, useRef, useEffect } from "react";
 import {
   BrainCircuit,
   ArrowRight,
@@ -26,9 +26,11 @@ import {
   Download,
   BarChart3,
   Link2,
+  MessageCircle,
+  Loader2,
 } from "lucide-react";
 import PlansModal from "@/components/PlansModal";
-import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS } from "@/data/mockDatabase";
+import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -38,6 +40,10 @@ const SC_BADGES = [
   { name: "DOAJ", color: "#38BDF8" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
+  { name: "Europe PMC", color: "#E11D48" },
+  { name: "BASE", color: "#8B5CF6" },
+  { name: "Lens.org", color: "#06B6D4" },
+  { name: "CORE", color: "#D97706" },
 ];
 
 const TABS = [
@@ -48,12 +54,18 @@ const TABS = [
   { id: "split", label: "Split PDF", icon: FileSearch, count: null },
 ];
 
-
 const VERIFICATION_STEPS = [
   { n: 1, icon: "🔗", title: "Acesse o DOI ou link do artigo", desc: "Confirme que o artigo existe e que título, autores e ano batem com o que aparece aqui. DOIs falsos ou incorretos são um dos erros mais comuns de IA." },
   { n: 2, icon: "📋", title: "Confira a referência ABNT gerada", desc: "Compare cada campo (autores, título, periódico, volume, páginas, ano) com o artigo original. A IA pode inverter nomes, errar volumes ou inventar páginas." },
   { n: 3, icon: "🔍", title: "Verifique o periódico no Qualis CAPES", desc: "Acesse sucupira.capes.gov.br e confira a classificação do periódico para sua área (A1 a C). Periódicos predatórios podem aparecer nos resultados." },
   { n: 4, icon: "📖", title: "Leia o abstract original", desc: "O resumo em português é uma tradução/simplificação feita por IA. Sempre leia o abstract original em inglês no site do periódico antes de citar em trabalho acadêmico." },
+];
+
+const QUICK_QUESTIONS = [
+  "Explica este estudo de forma simples",
+  "Quais são as limitações?",
+  "Esta fonte é confiável para citar?",
+  "Como verificar este artigo?",
 ];
 
 interface ResultsViewProps {
@@ -65,6 +77,40 @@ interface ResultsViewProps {
   onSearch: (term: string) => void;
   onBack: () => void;
 }
+
+/* ── Hallucination-filtered chat answer ── */
+const getContextualAnswer = (q: string, article: Article): string => {
+  const abstract = article.abstract_pt || "";
+  const ql = q.toLowerCase();
+
+  // Quick questions with abstract-grounded answers
+  if (ql.includes("explica") || ql.includes("simples") || ql.includes("resumo")) {
+    return `Com base no resumo disponível: Este é um ${article.study_type || "estudo"} de ${article.year}, publicado em ${article.journal}. ${abstract}`;
+  }
+  if (ql.includes("limitaç") || ql.includes("limitação") || ql.includes("limite")) {
+    const parts: string[] = [];
+    if (article.evidence_reason) parts.push(`Avaliação de evidência: ${article.evidence_reason}`);
+    if (article.potential_bias && article.potential_bias !== "Nenhum identificado") parts.push(`Viés identificado: ${article.potential_bias}`);
+    if (parts.length === 0) parts.push("O resumo disponível não detalha limitações específicas. Consulte o artigo completo via DOI para a seção de limitações.");
+    return parts.join(" ");
+  }
+  if (ql.includes("confiável") || ql.includes("citar") || ql.includes("fonte")) {
+    return `Avaliação para citação: Score de evidência ${article.evidence_score}/5 (${EVIDENCE_LABELS[article.evidence_score] || "N/A"}). ${article.expert_reviewed ? "✓ Avaliado por pares." : "⚠️ Não avaliado por pares — use com cautela."} ${article.citations > 0 ? `${article.citations.toLocaleString()} citações.` : ""} Publicado em ${article.journal} (${article.year}). ⚠️ Sempre confirme pelo DOI antes de citar.`;
+  }
+  if (ql.includes("verificar") || ql.includes("checar") || ql.includes("conferir")) {
+    return `Para verificar: 1) Acesse doi.org/${article.doi || "[consulte o DOI]"} e confirme que título e autores batem. 2) Leia o abstract original em inglês. 3) Confira o periódico "${article.journal}" no Qualis CAPES. 4) Compare a referência ABNT gerada com os dados do artigo original.`;
+  }
+
+  // Free-form: try to answer from abstract
+  const words = q.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const relevant = words.some(w => abstract.toLowerCase().includes(w));
+  
+  if (relevant) {
+    return `Com base no resumo disponível deste artigo: ${abstract}\n\n⚠️ Esta resposta é baseada exclusivamente no resumo. Para informações mais detalhadas, consulte o artigo completo via DOI.`;
+  }
+
+  return `⚠️ Esta informação específica não consta no resumo disponível deste artigo. O resumo aborda: "${abstract.substring(0, 150)}..." Para obter essa informação, acesse o artigo completo em doi.org/${article.doi || "[DOI]"}.`;
+};
 
 /* ── Score dots ── */
 const ScoreDots = ({ score }: { score: number }) => (
@@ -83,16 +129,36 @@ const ScoreDots = ({ score }: { score: number }) => (
   </div>
 );
 
-/* ── Article Card ── */
+/* ── Article Card with Chat ── */
 const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () => void; saved: boolean }) => {
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [msgs, setMsgs] = useState<{ role: string; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const studyInfo = STUDY_TYPE_MAP[article.study_type] || { icon: "📄", label: article.study_type };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
 
   const copyAbnt = () => {
     navigator.clipboard?.writeText(article.abnt);
     setCopiedAbnt(true);
     setTimeout(() => setCopiedAbnt(false), 2000);
+  };
+
+  const sendMessage = async (q?: string) => {
+    const m = (q || chatInput).trim();
+    if (!m) return;
+    setChatInput("");
+    setMsgs((prev) => [...prev, { role: "user", text: m }]);
+    setChatLoading(true);
+    await new Promise((r) => setTimeout(r, 600 + Math.random() * 600));
+    setMsgs((prev) => [...prev, { role: "ai", text: getContextualAnswer(m, article) }]);
+    setChatLoading(false);
   };
 
   return (
@@ -231,7 +297,94 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
           {copiedAbnt ? <Check size={12} /> : <Copy size={12} />}
           {copiedAbnt ? "Copiado!" : "ABNT"}
         </button>
+        <button
+          onClick={() => setShowChat(!showChat)}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+            showChat
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "bg-foreground/5 text-foreground/70 border-foreground/10 hover:border-primary/20"
+          }`}
+        >
+          <MessageCircle size={12} /> Perguntar à IA
+        </button>
       </div>
+
+      {/* Chat */}
+      {showChat && (
+        <div className="mt-4 bg-foreground/[0.02] rounded-2xl p-4 border border-foreground/5 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <MessageCircle size={14} className="text-primary" />
+            <span className="font-semibold">Perguntar sobre este artigo</span>
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">contexto: resumo do artigo</span>
+          </div>
+
+          {msgs.length === 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => sendMessage(q)}
+                  className="text-[11px] px-3 py-1.5 rounded-lg border border-foreground/10 bg-card/60 text-foreground/80 hover:bg-foreground/5 transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {msgs.length > 0 && (
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {msgs.map((m, i) => (
+                <div
+                  key={i}
+                  className={`text-xs p-3 rounded-xl leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-primary/10 text-foreground ml-8"
+                      : "bg-foreground/[0.03] text-foreground/80 mr-8 border border-foreground/5"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="flex gap-1 p-3">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-primary/40 animate-pulse"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+            className="flex gap-2"
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Pergunte algo sobre este artigo..."
+              className="flex-1 text-xs px-3 py-2 rounded-lg border border-foreground/10 bg-background/50 text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary outline-none"
+            />
+            <button
+              type="submit"
+              className="text-xs font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-all"
+            >
+              Enviar
+            </button>
+          </form>
+
+          <p className="text-[9px] text-muted-foreground/40 leading-relaxed">
+            ⚠️ Respostas baseadas exclusivamente no resumo do artigo. Se a informação não constar no resumo, a IA indicará claramente.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -315,6 +468,28 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
           );
         })}
       </div>
+
+      {/* Source distribution */}
+      <h4 className="font-semibold text-foreground text-sm mb-3 mt-6">Distribuição por fonte</h4>
+      <div className="space-y-2">
+        {Object.entries(
+          result.articles.reduce((acc, a) => {
+            acc[a.source] = (acc[a.source] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        ).map(([source, count]) => {
+          const badge = SC_BADGES.find(b => b.name === source);
+          return (
+            <div key={source} className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-foreground/70 w-48" style={{ color: badge?.color }}>{source}</span>
+              <div className="flex-1 bg-foreground/5 rounded-full h-2 overflow-hidden">
+                <div className="h-full rounded-full" style={{ backgroundColor: badge?.color || '#666' }} />
+              </div>
+              <span className="text-xs font-bold text-foreground/50 w-8 text-right">{count}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
 
     <div className="bg-card/40 border border-foreground/5 rounded-2xl p-5">
@@ -327,6 +502,23 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
         </>
       )}
     </div>
+
+    {/* Study Recortes */}
+    {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
+      <div className="bg-card/40 border border-foreground/5 rounded-2xl p-5">
+        <h4 className="font-semibold text-foreground text-sm mb-3 flex items-center gap-2">
+          🔍 Como os estudos se relacionam (Recortes)
+        </h4>
+        <div className="space-y-2">
+          {result.synthesis.study_recortes.map((r, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-foreground/[0.02] border border-foreground/5">
+              <span className="text-lg shrink-0">{["🔬", "📊", "📋", "🧬", "🌐"][i % 5]}</span>
+              <p className="text-xs text-foreground/70 leading-relaxed">{r}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
   </div>
 );
 
@@ -409,7 +601,7 @@ const AuditTab = ({ result }: { result: MockEntry }) => (
             {status === "error" && <XCircle size={16} className="text-rose-400 shrink-0 mt-0.5" />}
             <div className="flex-1">
               <h4 className="font-semibold text-foreground text-sm">{art.title}</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">{art.authors} · {art.year}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{art.authors} · {art.year} · via {art.source}</p>
               {issues.length === 0 ? (
                 <p className="text-xs text-emerald-400 mt-2">✓ Nenhum problema identificado. Fonte de alta qualidade.</p>
               ) : (
@@ -454,6 +646,43 @@ const SplitPdfTab = () => (
   </div>
 );
 
+/* ── Async source loading indicator ── */
+const SourceLoadingIndicator = ({ loadedSources }: { loadedSources: string[] }) => {
+  const allSources = SOURCE_LIST;
+  const pending = allSources.filter(s => !loadedSources.includes(s));
+  
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="bg-card/40 border border-foreground/5 rounded-2xl p-4 mb-4 flex items-center gap-3">
+      <Loader2 size={16} className="text-primary animate-spin shrink-0" />
+      <div className="flex-1">
+        <p className="text-xs font-semibold text-foreground/70">
+          Buscando em fontes adicionais...
+        </p>
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {pending.map(s => {
+            const badge = SC_BADGES.find(b => b.name === s);
+            return (
+              <span
+                key={s}
+                className="text-[9px] font-semibold px-2 py-0.5 rounded-full border animate-pulse"
+                style={{
+                  backgroundColor: `${badge?.color || '#666'}10`,
+                  color: `${badge?.color || '#666'}80`,
+                  borderColor: `${badge?.color || '#666'}20`,
+                }}
+              >
+                {s}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Main ResultsView ── */
 const ResultsView = ({
   query,
@@ -472,6 +701,23 @@ const ResultsView = ({
   const [oaFilter, setOaFilter] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
   const [showConfidenceDetail, setShowConfidenceDetail] = useState(false);
+  const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
+
+  // Simulate async source loading
+  useEffect(() => {
+    const batches = [
+      { sources: ["CrossRef", "DOAJ", "SciELO"], delay: 800 },
+      { sources: ["arXiv", "Europe PMC"], delay: 1600 },
+      { sources: ["BASE", "Lens.org"], delay: 2400 },
+      { sources: ["CORE"], delay: 3200 },
+    ];
+    const timers = batches.map(batch =>
+      setTimeout(() => {
+        setLoadedSources(prev => [...prev, ...batch.sources]);
+      }, batch.delay)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [result]);
 
   const toggleSave = (title: string) => {
     setSavedArticles((prev) =>
@@ -489,6 +735,12 @@ const ResultsView = ({
 
   const icmScore = (result.synthesis.confidence_score / 5 * 10).toFixed(1);
   const icmLabel = Number(icmScore) >= 8 ? "Muito forte" : Number(icmScore) >= 6 ? "Forte" : Number(icmScore) >= 4 ? "Moderado" : "Limitado";
+  const maturityLabel = result.synthesis.maturity_label || (
+    Number(icmScore) >= 8 ? "Consenso consolidado" : Number(icmScore) >= 6 ? "Evidência forte" : Number(icmScore) >= 4 ? "Debate ativo" : "Evidência emergente"
+  );
+
+  // Unique sources in results
+  const resultSources = [...new Set(result.articles.map(a => a.source))];
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
@@ -610,20 +862,34 @@ const ResultsView = ({
 
         {activeTab === "search" && (
           <>
+            {/* ASYNC SOURCE LOADING */}
+            <SourceLoadingIndicator loadedSources={loadedSources} />
+
             {/* CONSENSUS PANEL */}
             <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl p-6 md:p-8 border border-foreground/5 shadow-2xl mb-6">
-              <div className="mb-1">
+              <div className="mb-1 flex items-center gap-3">
                 <span className="text-primary/80 text-[10px] font-bold uppercase tracking-widest">
                   INTERPRETAÇÃO COM BASE EM {result.count} ESTUDOS CIENTÍFICOS
                 </span>
+                {result.synthesis.maturity_label && (
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    result.synthesis.maturity_label.includes("Consenso") 
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : result.synthesis.maturity_label.includes("Debate")
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                  }`}>
+                    {result.synthesis.maturity_label}
+                  </span>
+                )}
               </div>
               <h3 className="text-xl font-bold text-white mb-4">
                 "{query}"
               </h3>
 
-              {/* Source badges */}
-              <div className="flex gap-1.5 mb-5">
-                {["PubMed", "OpenAlex", "Semantic Scholar"].map((name) => {
+              {/* Source badges - show actual sources used */}
+              <div className="flex gap-1.5 mb-5 flex-wrap">
+                {resultSources.map((name) => {
                   const badge = SC_BADGES.find((b) => b.name === name);
                   return (
                     <span
@@ -643,6 +909,20 @@ const ResultsView = ({
                   {result.synthesis.direct_answer}
                 </p>
               </div>
+
+              {/* Study recortes in consensus */}
+              {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+                    🔍 RECORTES DOS ESTUDOS
+                  </span>
+                  {result.synthesis.study_recortes.map((r, i) => (
+                    <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/10 text-xs text-white/70 leading-relaxed">
+                      {r}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Horizontal consensus bars */}
               <div className="space-y-2.5 mb-6">
@@ -693,7 +973,7 @@ const ResultsView = ({
                       ÍNDICE DE CONFIANÇA METODOLÓGICA (ICM)
                     </span>
                     <p className="text-xs text-white/50">
-                      <span className="font-bold text-white/80">{icmLabel}</span> — baseado no tipo e citações dos estudos
+                      <span className="font-bold text-white/80">{icmLabel}</span> — baseado no tipo e citações dos estudos · <span className="font-semibold text-primary/80">{maturityLabel}</span>
                     </p>
                   </div>
                 </div>
@@ -722,7 +1002,6 @@ const ResultsView = ({
                       ))}
                     </div>
                   </div>
-                  {/* Explanation */}
                   <button
                     onClick={() => setShowConfidenceDetail(!showConfidenceDetail)}
                     className="text-[10px] text-primary/80 hover:text-primary underline mb-2 transition-colors"

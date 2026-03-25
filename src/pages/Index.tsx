@@ -140,7 +140,7 @@ const Index = () => {
           </h2>
 
           <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
-            Busca em 7 bases simultâneas, filtra os artigos revisados por
+            Busca em 11 bases simultâneas, filtra os artigos revisados por
             especialistas e mostra o nível de confiabilidade de cada fonte.
           </p>
 
