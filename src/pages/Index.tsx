@@ -42,6 +42,7 @@ const QUICK_SEARCHES = [
   "sono fragmentado aumenta risco de Alzheimer?",
   "meditação mindfulness reduz ansiedade?",
   "probióticos melhoram saúde intestinal?",
+  "redes sociais causam vício em dopamina?",
 ];
 
 const FEATURES = [
