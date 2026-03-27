@@ -1,12 +1,10 @@
-import { type FormEvent, useState, useRef, useEffect } from "react";
+import { type FormEvent, useState, useRef, useEffect, memo } from "react";
+import { Link } from "react-router-dom";
 import {
   BrainCircuit,
   ArrowRight,
   Search,
-  Target,
-  Lightbulb,
   Zap,
-  Clock,
   Bot,
   AlertTriangle,
   CheckCircle2,
@@ -14,7 +12,6 @@ import {
   Info,
   BookOpen,
   FileText,
-  ClipboardCheck,
   FileSearch,
   X,
   ExternalLink,
@@ -27,9 +24,16 @@ import {
   BarChart3,
   Link2,
   MessageCircle,
+  MessageSquarePlus,
   Loader2,
+  Bookmark,
 } from "lucide-react";
 import PlansModal from "@/components/PlansModal";
+import FeedbackModal from "@/components/FeedbackModal";
+import DevModal from "@/components/DevModal";
+import PromoCodeModal from "@/components/PromoCodeModal";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
+import { useQueryIntention } from "@/hooks/useQueryIntention";
 import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
 
 const SC_BADGES = [
@@ -44,14 +48,16 @@ const SC_BADGES = [
   { name: "BASE", color: "#8B5CF6" },
   { name: "Lens.org", color: "#06B6D4" },
   { name: "CORE", color: "#D97706" },
+  { name: "Cochrane", color: "#7C3AED" },
+  { name: "BVS/LILACS", color: "#059669" },
 ];
 
 const TABS = [
   { id: "search", label: "Pesquisar", icon: Search, count: null },
   { id: "analysis", label: "Análises", icon: BarChart3, count: null },
   { id: "references", label: "Referências", icon: FileText, count: null },
-  { id: "audit", label: "Auditoria", icon: ClipboardCheck, count: 1 },
   { id: "split", label: "Split PDF", icon: FileSearch, count: null },
+  { id: "saved", label: "Meus Salvos", icon: Bookmark, count: null },
 ];
 
 const VERIFICATION_STEPS = [
@@ -74,8 +80,9 @@ interface ResultsViewProps {
   searchesLeft: number;
   onQueryChange: (q: string) => void;
   onSubmit: (e: FormEvent) => void;
-  onSearch: (term: string) => void;
+  onSearch: (term: string, options?: { lang?: string }) => void;
   onBack: () => void;
+  synthesisLoading?: boolean;
 }
 
 /* ── Hallucination-filtered chat answer ── */
@@ -114,11 +121,14 @@ const getContextualAnswer = (q: string, article: Article): string => {
 
 /* ── Score dots ── */
 const ScoreDots = ({ score }: { score: number }) => (
-  <div className="flex items-center gap-1">
+  <div
+    className="flex items-center gap-1 cursor-help"
+    title={`Evidência ${score}/5: 1=Opinião · 2=Caso clínico · 3=Coorte/Observacional · 4=Revisão sistemática · 5=Meta-análise`}
+  >
     {[1, 2, 3, 4, 5].map((i) => (
       <div
         key={i}
-        className={`w-2.5 h-2.5 rounded-full ${
+        className={`w-3 h-3 rounded-full ${
           i <= score ? "bg-primary" : "bg-foreground/10"
         }`}
       />
@@ -130,7 +140,7 @@ const ScoreDots = ({ score }: { score: number }) => (
 );
 
 /* ── Article Card with Chat ── */
-const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () => void; saved: boolean }) => {
+const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave: () => void; saved: boolean }) => {
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -194,8 +204,9 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
       </p>
 
       {/* Score */}
-      <div className="mb-3">
+      <div className="mb-3 space-y-2">
         <ScoreDots score={article.evidence_score} />
+        <ConfidenceBadge score={article.confidence_score} factors={article.confidence_factors} />
       </div>
 
       {/* Why this score */}
@@ -264,25 +275,28 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
 
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        <a
-          href={`https://doi.org/${article.doi}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-        >
-          <Link2 size={12} /> DOI
-        </a>
-        <a
-          href={`https://doi.org/${article.doi}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/70 border border-foreground/10 hover:border-primary/20 transition-colors"
-        >
-          <ExternalLink size={12} /> Ver artigo
-        </a>
-        {article.is_oa && (
+        {article.doi && (
+          article.isMock ? (
+            <span
+              title="Artigo de Demonstração — DOI de exemplo, link indisponível"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-not-allowed opacity-75"
+            >
+              <AlertTriangle size={12} /> Demo (DOI indisponível)
+            </span>
+          ) : (
+            <a
+              href={`https://doi.org/${article.doi}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+            >
+              <ExternalLink size={12} /> Ver artigo
+            </a>
+          )
+        )}
+        {article.is_oa && article.pdf_url && (
           <a
-            href={`https://doi.org/${article.doi}`}
+            href={article.pdf_url}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
@@ -319,6 +333,8 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
           </div>
 
           {msgs.length === 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/60 mb-2">💡 Respostas baseadas exclusivamente no resumo do artigo — não no texto completo</p>
             <div className="flex flex-wrap gap-1.5">
               {QUICK_QUESTIONS.map((q) => (
                 <button
@@ -329,6 +345,7 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
                   {q}
                 </button>
               ))}
+            </div>
             </div>
           )}
 
@@ -387,11 +404,19 @@ const ArticleCard = ({ article, onSave, saved }: { article: Article; onSave: () 
       )}
     </div>
   );
-};
+});
 
 /* ── Verification Guide ── */
 const VerificationGuide = () => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    try {
+      if (!localStorage.getItem("vguide_seen")) {
+        localStorage.setItem("vguide_seen", "1");
+        return true;
+      }
+    } catch {}
+    return false;
+  });
   return (
     <div className="bg-card/40 border border-foreground/5 rounded-2xl mb-6 overflow-hidden">
       <button
@@ -403,7 +428,7 @@ const VerificationGuide = () => {
         <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded text-[10px] font-bold ml-1">
           ⚠️ IA pode errar
         </span>
-        <span className="ml-auto text-muted-foreground">{open ? "▲" : "▼"}</span>
+        <span className="ml-auto text-muted-foreground" aria-label={open ? "Fechar guia" : "Abrir guia de verificação"}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-1">
@@ -483,7 +508,7 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
             <div key={source} className="flex items-center gap-3">
               <span className="text-xs font-semibold text-foreground/70 w-48" style={{ color: badge?.color }}>{source}</span>
               <div className="flex-1 bg-foreground/5 rounded-full h-2 overflow-hidden">
-                <div className="h-full rounded-full" style={{ backgroundColor: badge?.color || '#666' }} />
+                <div className="h-full rounded-full" style={{ backgroundColor: badge?.color || '#666', width: `${(count / result.articles.length) * 100}%` }} />
               </div>
               <span className="text-xs font-bold text-foreground/50 w-8 text-right">{count}</span>
             </div>
@@ -524,13 +549,13 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
 
 /* ── Tab: Referências ── */
 const ReferencesTab = ({ result }: { result: MockEntry }) => {
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
 
-  const copyOne = (abnt: string, idx: number) => {
+  const copyOne = (abnt: string, key: string) => {
     navigator.clipboard?.writeText(abnt);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
   };
 
   const copyAll = () => {
@@ -542,7 +567,8 @@ const ReferencesTab = ({ result }: { result: MockEntry }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <h3 className="font-bold text-foreground flex items-center gap-2">
           <FileText size={16} className="text-primary" /> Referências ABNT
         </h3>
@@ -554,97 +580,92 @@ const ReferencesTab = ({ result }: { result: MockEntry }) => {
           {copiedAll ? "Copiado tudo!" : "Copiar todas"}
         </button>
       </div>
+
+      {/* Explanatory card */}
+      <div className="bg-primary/5 border border-primary/15 rounded-xl p-4 space-y-2">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Info size={14} className="text-primary shrink-0" /> O que são essas referências?
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          As referências abaixo foram geradas automaticamente no formato <strong>ABNT NBR 6023</strong> com base nos metadados dos artigos encontrados.
+          São um ponto de partida — sempre valide cada campo (autores, título, volume, páginas, ano) consultando o artigo original antes de incluir em trabalho acadêmico.
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          <strong>DOIs nesta versão demonstrativa</strong> são exemplos de estrutura e podem não estar ativos. Para verificar um artigo real, acesse <span className="font-mono text-primary">doi.org/[DOI]</span> diretamente.
+        </p>
+      </div>
+
+      {/* Warning */}
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-300">
         <AlertTriangle size={14} className="shrink-0 mt-0.5" />
         <span>Referências geradas por IA. Sempre confira com o artigo original antes de incluir no seu trabalho.</span>
       </div>
-      {result.articles.map((art, i) => (
-        <div key={i} className="bg-card/40 border border-foreground/5 rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground mb-1">{art.year} · {art.journal} · {art.source}</p>
-              <p className="text-sm font-mono text-foreground/80 leading-relaxed">{art.abnt}</p>
+
+      {/* Article list */}
+      {result.articles.map((art) => {
+        const key = art.doi || art.title;
+        return (
+          <div key={key} className="bg-card/40 border border-foreground/5 rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded">{art.year}</span>
+                  <span className="text-[10px] text-muted-foreground">{art.journal}</span>
+                  <span className="text-[10px] text-muted-foreground/60">via {art.source}</span>
+                </div>
+                <p className="text-xs font-mono text-foreground/80 leading-relaxed break-words">{art.abnt}</p>
+                {art.doi && (
+                  <p className="text-[10px] text-muted-foreground/50 mt-2 font-mono">DOI: {art.doi}</p>
+                )}
+              </div>
+              <button
+                onClick={() => copyOne(art.abnt, key)}
+                aria-label="Copiar referência ABNT"
+                className="shrink-0 p-2 rounded-lg hover:bg-foreground/5 transition-colors"
+              >
+                {copiedKey === key ? <Check size={14} className="text-primary" /> : <Copy size={14} className="text-muted-foreground" />}
+              </button>
             </div>
-            <button
-              onClick={() => copyOne(art.abnt, i)}
-              className="shrink-0 p-2 rounded-lg hover:bg-foreground/5 transition-colors"
-            >
-              {copiedIdx === i ? <Check size={14} className="text-primary" /> : <Copy size={14} className="text-muted-foreground" />}
-            </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
 
-/* ── Tab: Auditoria ── */
-const AuditTab = ({ result }: { result: MockEntry }) => (
-  <div className="space-y-4">
-    <h3 className="font-bold text-foreground flex items-center gap-2">
-      <ClipboardCheck size={16} className="text-primary" /> Auditoria de Fontes
-    </h3>
-    <p className="text-sm text-muted-foreground">Verificação automática da qualidade e confiabilidade das fontes encontradas.</p>
-    {result.articles.map((art, i) => {
-      const issues: string[] = [];
-      if (art.potential_bias !== "Nenhum identificado") issues.push(art.potential_bias);
-      if (art.evidence_score <= 2) issues.push("Nível de evidência baixo para sustentar conclusões fortes.");
-      if (!art.expert_reviewed) issues.push("Artigo não avaliado por pares.");
-      const status = issues.length === 0 ? "ok" : issues.length === 1 ? "warn" : "error";
-      return (
-        <div key={i} className={`bg-card/40 border rounded-2xl p-4 ${
-          status === "ok" ? "border-emerald-500/20" : status === "warn" ? "border-amber-500/20" : "border-rose-500/20"
-        }`}>
-          <div className="flex items-start gap-3">
-            {status === "ok" && <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />}
-            {status === "warn" && <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />}
-            {status === "error" && <XCircle size={16} className="text-rose-400 shrink-0 mt-0.5" />}
-            <div className="flex-1">
-              <h4 className="font-semibold text-foreground text-sm">{art.title}</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">{art.authors} · {art.year} · via {art.source}</p>
-              {issues.length === 0 ? (
-                <p className="text-xs text-emerald-400 mt-2">✓ Nenhum problema identificado. Fonte de alta qualidade.</p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {issues.map((issue, j) => (
-                    <li key={j} className="text-xs text-amber-300">⚠ {issue}</li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
-                <span>Evidência: {art.evidence_score}/5</span>
-                <span>Qualidade: {art.source_quality}</span>
-                <span>{art.expert_reviewed ? "✓ Peer-reviewed" : "✗ Não revisado"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-);
-
 /* ── Tab: Split PDF ── */
-const SplitPdfTab = () => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="bg-primary/10 p-4 rounded-2xl mb-4">
-      <FileSearch size={32} className="text-primary" />
+const SplitPdfTab = ({ onTriggeDev }: { onTriggeDev: () => void }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileClick = () => {
+    onTriggeDev();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="bg-primary/10 p-5 rounded-2xl mb-5">
+        <FileSearch size={36} className="text-primary" />
+      </div>
+      <h3 className="font-bold text-foreground text-lg mb-2">Dissecar artigo em PDF</h3>
+      <p className="text-sm text-muted-foreground max-w-md mb-6 leading-relaxed">
+        Envie um PDF de artigo científico e a IA extrai automaticamente: objetivo, amostra, resultado principal,
+        p-valor, conflito de interesse e limitações — até as que os autores não declararam.
+      </p>
+      <label
+        onClick={handleFileClick}
+        className="border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 w-full max-w-md transition-colors cursor-pointer bg-primary/5 flex flex-col items-center"
+      >
+        <Download size={24} className="text-primary mx-auto mb-2" />
+        <p className="text-sm text-foreground/70">Arraste um PDF ou clique para selecionar</p>
+        <p className="text-[10px] text-muted-foreground mt-1">Máximo 20MB · Apenas PDF</p>
+        <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileClick} />
+      </label>
+      <p className="text-xs text-muted-foreground mt-4">
+        Em desenvolvimento · Teste as buscas akademcias enquanto isso
+      </p>
     </div>
-    <h3 className="font-bold text-foreground text-lg mb-2">Dissecar artigo em PDF</h3>
-    <p className="text-sm text-muted-foreground max-w-md mb-6 leading-relaxed">
-      Envie um PDF de artigo científico e a IA extrai automaticamente: objetivo, amostra, 
-      resultado principal, p-valor, conflito de interesse e limitações — até as que os autores não declararam.
-    </p>
-    <div className="border-2 border-dashed border-foreground/10 rounded-2xl p-8 w-full max-w-md hover:border-primary/30 transition-colors cursor-pointer">
-      <Download size={24} className="text-muted-foreground mx-auto mb-2" />
-      <p className="text-sm text-muted-foreground">Arraste um PDF ou clique para selecionar</p>
-      <p className="text-[10px] text-muted-foreground mt-1">Máximo 20MB · Apenas PDF</p>
-    </div>
-    <p className="text-xs text-muted-foreground mt-4">
-      Funcionalidade disponível nos planos <span className="text-primary font-semibold">Estudante</span> e <span className="text-primary font-semibold">Pesquisador</span>
-    </p>
-  </div>
-);
+  );
+};
 
 /* ── Async source loading indicator ── */
 const SourceLoadingIndicator = ({ loadedSources }: { loadedSources: string[] }) => {
@@ -692,16 +713,53 @@ const ResultsView = ({
   onSubmit,
   onSearch,
   onBack,
+  synthesisLoading = false,
 }: ResultsViewProps) => {
+  const queryIntention = useQueryIntention(query);
   const [activeTab, setActiveTab] = useState("search");
-  const [savedArticles, setSavedArticles] = useState<string[]>([]);
+  const [savedArticles, setSavedArticles] = useState<Article[]>(() => {
+    try {
+      const stored = localStorage.getItem("emerald_saved_articles");
+      return stored ? (JSON.parse(stored) as Article[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [scoreFilter, setScoreFilter] = useState(0);
   const [sourceFilter, setSourceFilter] = useState("Todas");
   const [expertFilter, setExpertFilter] = useState(false);
   const [oaFilter, setOaFilter] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
-  const [showConfidenceDetail, setShowConfidenceDetail] = useState(false);
+  const [consensusTab, setConsensusTab] = useState<"distribuicao" | "detalhes" | "insights">("distribuicao");
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
+  const [displayCount, setDisplayCount] = useState(5);
+  const [pdfUnlocked, setPdfUnlocked] = useState(false);
+  const [showPromo, setShowPromo] = useState(false);
+  const [showDev, setShowDev] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"relevancia" | "recentes" | "evidencia" | "citacoes">("relevancia");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [savedToast, setSavedToast] = useState<string | null>(null);
   const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
+  const [ptEsFilter, setPtEsFilter] = useState(false);
+  const scrollPosRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    setDisplayCount(5);
+    setLoadedSources(["PubMed", "OpenAlex", "Semantic Scholar"]);
+    scrollPosRef.current = {};
+  }, [result]);
+
+  useEffect(() => {
+    if (!savedToast) return;
+    const t = setTimeout(() => setSavedToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [savedToast]);
+
+  const handleTabChange = (tabId: string) => {
+    scrollPosRef.current[activeTab] = window.scrollY;
+    setActiveTab(tabId);
+    setTimeout(() => window.scrollTo({ top: scrollPosRef.current[tabId] ?? 0, behavior: "instant" as ScrollBehavior }), 0);
+  };
 
   // Simulate async source loading
   useEffect(() => {
@@ -709,7 +767,8 @@ const ResultsView = ({
       { sources: ["CrossRef", "DOAJ", "SciELO"], delay: 800 },
       { sources: ["arXiv", "Europe PMC"], delay: 1600 },
       { sources: ["BASE", "Lens.org"], delay: 2400 },
-      { sources: ["CORE"], delay: 3200 },
+      { sources: ["CORE", "Cochrane"], delay: 3200 },
+      { sources: ["BVS/LILACS"], delay: 4000 },
     ];
     const timers = batches.map(batch =>
       setTimeout(() => {
@@ -719,21 +778,40 @@ const ResultsView = ({
     return () => timers.forEach(clearTimeout);
   }, [result]);
 
-  const toggleSave = (title: string) => {
-    setSavedArticles((prev) =>
-      prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]
-    );
+  const toggleSave = (article: Article) => {
+    setSavedArticles((prev) => {
+      const isSaved = prev.some((a) => a.title === article.title);
+      const updated = isSaved
+        ? prev.filter((a) => a.title !== article.title)
+        : [...prev, article];
+      try {
+        localStorage.setItem("emerald_saved_articles", JSON.stringify(updated));
+        setSavedToast(isSaved ? "Artigo removido dos salvos" : "Artigo salvo em Meus Salvos 💾");
+      } catch {
+        setSavedToast("⚠️ Não foi possível salvar — tente fora do modo privado");
+      }
+      return updated;
+    });
   };
 
-  const filteredArticles = result.articles.filter((a) => {
-    if (scoreFilter > 0 && a.evidence_score < scoreFilter) return false;
-    if (sourceFilter !== "Todas" && a.source !== sourceFilter) return false;
-    if (expertFilter && !a.expert_reviewed) return false;
-    if (oaFilter && !a.is_oa) return false;
-    return true;
-  });
+  const PT_ES_SOURCES = ["SciELO", "BVS/LILACS"];
+  const filteredArticles = result.articles
+    .filter((a) => {
+      if (scoreFilter > 0 && a.evidence_score < scoreFilter) return false;
+      if (sourceFilter !== "Todas" && a.source !== sourceFilter) return false;
+      if (expertFilter && !a.expert_reviewed) return false;
+      if (oaFilter && !a.is_oa) return false;
+      if (ptEsFilter && !PT_ES_SOURCES.includes(a.source)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "recentes") return parseInt(b.year) - parseInt(a.year);
+      if (sortOrder === "evidencia") return b.evidence_score - a.evidence_score;
+      if (sortOrder === "citacoes") return b.citations - a.citations;
+      return 0; // relevancia = original order
+    });
 
-  const icmScore = (result.synthesis.confidence_score / 5 * 10).toFixed(1);
+  const icmScore = (result.synthesis.confidence_score / 10).toFixed(1);
   const icmLabel = Number(icmScore) >= 8 ? "Muito forte" : Number(icmScore) >= 6 ? "Forte" : Number(icmScore) >= 4 ? "Moderado" : "Limitado";
   const maturityLabel = result.synthesis.maturity_label || (
     Number(icmScore) >= 8 ? "Consenso consolidado" : Number(icmScore) >= 6 ? "Evidência forte" : Number(icmScore) >= 4 ? "Debate ativo" : "Evidência emergente"
@@ -758,6 +836,12 @@ const ResultsView = ({
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            to="/fontes"
+            className="hidden sm:block border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+          >
+            Nossas Fontes
+          </Link>
           <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes
           </div>
@@ -771,6 +855,14 @@ const ResultsView = ({
       </header>
 
       <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+      <FeedbackModal open={showFeedback} onClose={() => setShowFeedback(false)} />
+      <PromoCodeModal
+        open={showPromo}
+        onClose={() => setShowPromo(false)}
+        onSuccess={() => { setShowPromo(false); setPdfUnlocked(true); }}
+        featureName="o Split PDF"
+      />
+      <DevModal open={showDev} onClose={() => setShowDev(false)} onSearch={onSearch} />
 
       <main className="max-w-4xl mx-auto px-5 py-6">
         {/* TIPS BAR */}
@@ -780,7 +872,7 @@ const ResultsView = ({
               💡 COMO OBTER MELHORES RESULTADOS
             </span>
             <span className="text-muted-foreground">
-              Perguntas específicas com causa e efeito trazem muito mais artigos relevantes.
+              Use termos acadêmicos específicos ou perguntas de pesquisa com causa e efeito.
             </span>
           </div>
           <div>
@@ -788,7 +880,7 @@ const ResultsView = ({
               ✗ EVITE
             </span>
             <span className="text-muted-foreground">
-              benefícios do açafrão<br />chá é saudável?
+              alzheimer<br />benefícios do açafrão
             </span>
           </div>
           <div>
@@ -796,7 +888,7 @@ const ResultsView = ({
               ✓ PREFIRA
             </span>
             <span className="text-muted-foreground">
-              açafrão reduz depressão em adultos?<br />sono fragmentado causa Alzheimer?
+              açafrão reduz depressão em adultos?<br />resistência antimicrobiana Enterobacteriaceae
             </span>
           </div>
         </div>
@@ -814,6 +906,7 @@ const ResultsView = ({
             {query && (
               <button
                 type="button"
+                aria-label="Limpar busca"
                 onClick={() => onQueryChange("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
@@ -834,7 +927,8 @@ const ResultsView = ({
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
+              aria-label={`Aba ${tab.label}`}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-primary text-primary-foreground"
@@ -843,7 +937,13 @@ const ResultsView = ({
             >
               <tab.icon size={15} />
               {tab.label}
-              {tab.count !== null && (
+              {tab.id === "saved" && savedArticles.length > 0 ? (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-foreground/10"
+                }`}>
+                  {savedArticles.length}
+                </span>
+              ) : tab.count !== null && (
                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                   activeTab === tab.id ? "bg-primary-foreground/20" : "bg-foreground/10"
                 }`}>
@@ -857,23 +957,96 @@ const ResultsView = ({
         {/* TAB CONTENT */}
         {activeTab === "analysis" && <AnalysisTab result={result} query={query} />}
         {activeTab === "references" && <ReferencesTab result={result} />}
-        {activeTab === "audit" && <AuditTab result={result} />}
-        {activeTab === "split" && <SplitPdfTab />}
+        {activeTab === "split" && <SplitPdfTab onTriggeDev={() => setShowDev(true)} />}
+        {activeTab === "saved" && (
+          <div className="space-y-4">
+            {savedArticles.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+                <Bookmark size={40} className="text-muted-foreground/30" />
+                <div>
+                  <p className="font-semibold text-foreground/60">Nenhum artigo salvo ainda</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Use o ícone <Bookmark size={12} className="inline" /> nos artigos para salvá-los aqui
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {savedArticles.length} artigo{savedArticles.length !== 1 ? "s" : ""} salvo{savedArticles.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">💾 Salvos neste dispositivo — não sincronizados em nuvem</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!confirm(`Remover todos os ${savedArticles.length} artigos salvos? Esta ação não pode ser desfeita.`)) return;
+                      setSavedArticles([]);
+                      try { localStorage.removeItem("emerald_saved_articles"); } catch {}
+                    }}
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    Limpar todos
+                  </button>
+                </div>
+                {savedArticles.map((art) => (
+                  <ArticleCard
+                    key={art.title}
+                    article={art}
+                    saved={true}
+                    onSave={() => toggleSave(art)}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        )}
 
         {activeTab === "search" && (
           <>
             {/* ASYNC SOURCE LOADING */}
             <SourceLoadingIndicator loadedSources={loadedSources} />
 
-            {/* CONSENSUS PANEL */}
-            <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl p-6 md:p-8 border border-foreground/5 shadow-2xl mb-6">
-              <div className="mb-1 flex items-center gap-3">
-                <span className="text-primary/80 text-[10px] font-bold uppercase tracking-widest">
-                  INTERPRETAÇÃO COM BASE EM {result.count} ESTUDOS CIENTÍFICOS
+            {/* QUERY INTENTION INDICATOR */}
+            <div className={`rounded-2xl p-4 mb-6 border ${
+              queryIntention.mode === "consensus"
+                ? "bg-emerald-500/5 border-emerald-500/20"
+                : "bg-blue-500/5 border-blue-500/20"
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                  queryIntention.mode === "consensus"
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-blue-500/20 text-blue-400"
+                }`}>
+                  {queryIntention.mode === "consensus" ? "🎯 Modo: Análise de Consenso" : "📋 Modo: Resumo Interpretativo"}
                 </span>
+                <span className={`text-xs ${
+                  queryIntention.mode === "consensus"
+                    ? "text-emerald-300"
+                    : "text-blue-300"
+                }`}>
+                  {queryIntention.description}
+                </span>
+              </div>
+            </div>
+
+            {/* UNIFIED SYNTHESIS PANEL */}
+            <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl p-6 md:p-8 border border-foreground/5 shadow-2xl mb-6">
+              {/* Header */}
+              <div className="mb-1 flex items-center gap-3 flex-wrap">
+                <span className="text-primary/80 text-[10px] font-bold uppercase tracking-widest">
+                  {result.count} ESTUDOS ANALISADOS
+                </span>
+                {synthesisLoading && (
+                  <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">
+                    Gerando síntese com IA...
+                  </span>
+                )}
                 {result.synthesis.maturity_label && (
                   <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                    result.synthesis.maturity_label.includes("Consenso") 
+                    result.synthesis.maturity_label.includes("Consenso")
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                       : result.synthesis.maturity_label.includes("Debate")
                         ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
@@ -883,11 +1056,9 @@ const ResultsView = ({
                   </span>
                 )}
               </div>
-              <h3 className="text-xl font-bold text-white mb-4">
-                "{query}"
-              </h3>
+              <h3 className="text-xl font-bold text-white mb-4">"{query}"</h3>
 
-              {/* Source badges - show actual sources used */}
+              {/* Source badges */}
               <div className="flex gap-1.5 mb-5 flex-wrap">
                 {resultSources.map((name) => {
                   const badge = SC_BADGES.find((b) => b.name === name);
@@ -903,139 +1074,161 @@ const ResultsView = ({
                 })}
               </div>
 
-              {/* Direct answer */}
-              <div className="p-5 bg-white/5 rounded-2xl border border-white/10 mb-6">
-                <p className="text-sm text-white/90 leading-relaxed">
-                  {result.synthesis.direct_answer}
-                </p>
+              {/* Stats row */}
+              <p className="text-[10px] text-white/40 mb-2">
+                {queryIntention.mode === "consensus"
+                  ? <>De {result.count} estudos encontrados — distribuição dos resultados: <span className="ml-1 text-white/30" title="Concordam = chegam à mesma conclusão · Inconclusivo = sem resultado claro · Contradizem = conclusão oposta">ⓘ</span></>
+                  : `${result.count} estudos analisados — síntese temática`}
+              </p>
+              <div className={`grid gap-3 mb-5 ${queryIntention.mode === "consensus" ? "grid-cols-3" : "grid-cols-2"}`}>
+                {queryIntention.mode === "consensus" && (
+                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
+                    <span className={`text-2xl font-black ${
+                      result.synthesis.consensus_agree >= 70 ? "text-emerald-400" :
+                      result.synthesis.consensus_agree >= 50 ? "text-amber-400" : "text-rose-400"
+                    }`}>{result.synthesis.consensus_agree}%</span>
+                    <p className="text-[10px] text-white/50 mt-0.5">Concordam</p>
+                  </div>
+                )}
+                <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
+                  <span className="text-2xl font-black text-white">{icmScore}</span>
+                  <p className="text-[10px] text-white/50 mt-0.5">ICM /10</p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
+                  <span className="text-sm font-black text-white capitalize leading-tight block mt-1">{result.synthesis.confidence_level}</span>
+                  <p className="text-[10px] text-white/50 mt-0.5">Confiança</p>
+                </div>
               </div>
 
-              {/* Study recortes in consensus */}
-              {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
-                <div className="mb-6 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-                    🔍 RECORTES DOS ESTUDOS
-                  </span>
-                  {result.synthesis.study_recortes.map((r, i) => (
-                    <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/10 text-xs text-white/70 leading-relaxed">
-                      {r}
+              {/* Direct answer */}
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 mb-5">
+                {synthesisLoading ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-3 bg-white/10 rounded-full w-full" />
+                    <div className="h-3 bg-white/10 rounded-full w-5/6" />
+                    <div className="h-3 bg-white/10 rounded-full w-4/6" />
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/90 leading-relaxed">{result.synthesis.direct_answer}</p>
+                )}
+              </div>
+
+              {/* Inner tabs */}
+              <div className="flex gap-1 bg-white/5 rounded-xl p-1 mb-4">
+                {[
+                  ...(queryIntention.mode === "consensus" ? [{ id: "distribuicao" as const, label: "Distribuição" }] : []),
+                  { id: "detalhes" as const, label: "Análise" },
+                  { id: "insights" as const, label: "Insights" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setConsensusTab(tab.id)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      (consensusTab === tab.id || (consensusTab === "distribuicao" && queryIntention.mode === "summary" && tab.id === "detalhes"))
+                        ? "bg-white/15 text-white"
+                        : "text-white/40 hover:text-white/70"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab: Distribuição */}
+              {consensusTab === "distribuicao" && queryIntention.mode === "consensus" && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
+                      <CheckCircle2 size={11} className="text-emerald-400" /> Concordam
+                    </span>
+                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${result.synthesis.consensus_agree}%` }} />
                     </div>
-                  ))}
+                    <span className="text-xs font-bold text-emerald-400 w-10 text-right">{result.synthesis.consensus_agree}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
+                      <AlertTriangle size={11} className="text-amber-400" /> Inconclusivo
+                    </span>
+                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full bg-amber-400" style={{ width: `${result.synthesis.consensus_inconclusive}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 w-10 text-right">{result.synthesis.consensus_inconclusive}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
+                      <XCircle size={11} className="text-rose-400" /> Contradizem
+                    </span>
+                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full bg-rose-400" style={{ width: `${result.synthesis.consensus_contradict}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-rose-400 w-10 text-right">{result.synthesis.consensus_contradict}%</span>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-white/10 flex items-baseline gap-2">
+                    <span className="text-xl font-black text-white">{icmScore}</span>
+                    <span className="text-xs text-white/50">/10 · ICM</span>
+                    <span className="text-xs text-white/40 ml-1">— {icmLabel}</span>
+                  </div>
                 </div>
               )}
 
-              {/* Horizontal consensus bars */}
-              <div className="space-y-2.5 mb-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold text-white/70 w-36 flex items-center gap-1.5">
-                    <CheckCircle2 size={13} className="text-emerald-400" /> Estudos concordam
-                  </span>
-                  <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${result.synthesis.consensus_agree}%` }} />
-                  </div>
-                  <span className="text-xs font-bold text-emerald-400 w-10 text-right">
-                    {result.synthesis.consensus_agree}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold text-white/70 w-36 flex items-center gap-1.5">
-                    <AlertTriangle size={13} className="text-amber-400" /> Inconclusivo
-                  </span>
-                  <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${result.synthesis.consensus_inconclusive}%` }} />
-                  </div>
-                  <span className="text-xs font-bold text-amber-400 w-10 text-right">
-                    {result.synthesis.consensus_inconclusive}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold text-white/70 w-36 flex items-center gap-1.5">
-                    <XCircle size={13} className="text-rose-400" /> Contradizem
-                  </span>
-                  <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                    <div className="h-full rounded-full bg-rose-400" style={{ width: `${result.synthesis.consensus_contradict}%` }} />
-                  </div>
-                  <span className="text-xs font-bold text-rose-400 w-10 text-right">
-                    {result.synthesis.consensus_contradict}%
-                  </span>
-                </div>
-              </div>
-
-              {/* ICM Score */}
-              <div className="bg-white/5 rounded-2xl p-4 mb-6 border border-white/10">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <span className="text-2xl font-black text-white">{icmScore}</span>
-                    <span className="text-xs text-white/50 ml-1">/10</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                      ÍNDICE DE CONFIANÇA METODOLÓGICA (ICM)
-                    </span>
-                    <p className="text-xs text-white/50">
-                      <span className="font-bold text-white/80">{icmLabel}</span> — baseado no tipo e citações dos estudos · <span className="font-semibold text-primary/80">{maturityLabel}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Confidence + Insight */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2 block">
-                    NÍVEL DE CONFIANÇA
-                  </span>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-bold text-white capitalize">
-                      {result.synthesis.confidence_level}
-                    </span>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          className={`w-3 h-3 rounded-sm ${
-                            i <= result.synthesis.confidence_score
-                              ? "bg-primary"
-                              : "bg-white/10"
-                          }`}
-                        />
+              {/* Tab: Análise */}
+              {(consensusTab === "detalhes" || (consensusTab === "distribuicao" && queryIntention.mode === "summary")) && (
+                <div className="space-y-4">
+                  {result.synthesis.inconclusive_summary && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Pontos inconclusivos</span>
+                      <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.inconclusive_summary}</p>
+                    </div>
+                  )}
+                  {result.synthesis.contradict_explanation && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Estudos que contradizem</span>
+                      <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.contradict_explanation}</p>
+                    </div>
+                  )}
+                  {result.synthesis.confidence_reasons && result.synthesis.confidence_reasons.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Razões da confiança</span>
+                      {result.synthesis.confidence_reasons.map((r, i) => (
+                        <p key={i} className="text-sm text-white/70">· {r}</p>
                       ))}
                     </div>
-                  </div>
-                  <button
-                    onClick={() => setShowConfidenceDetail(!showConfidenceDetail)}
-                    className="text-[10px] text-primary/80 hover:text-primary underline mb-2 transition-colors"
-                  >
-                    {showConfidenceDetail ? "Ocultar explicação" : "Por que é " + result.synthesis.confidence_level + "?"}
-                  </button>
-                  {showConfidenceDetail && (
-                    <p className="text-[11px] text-white/60 leading-relaxed mb-2 p-2 bg-white/5 rounded-lg">
-                      {CONFIDENCE_EXPLANATIONS[result.synthesis.confidence_level] || ""}
-                    </p>
                   )}
-                  {result.synthesis.confidence_reasons?.map((r, i) => (
-                    <p key={i} className="text-[11px] text-white/50 leading-relaxed">
-                      · {r}
-                    </p>
-                  ))}
                 </div>
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2 flex items-center gap-1.5">
-                    💡 INSIGHT PRÁTICO
-                  </span>
-                  <p className="text-sm text-white/80 leading-relaxed">
-                    {result.synthesis.practical_insight}
-                  </p>
+              )}
+
+              {/* Tab: Insights */}
+              {consensusTab === "insights" && (
+                <div className="space-y-4">
+                  {result.synthesis.practical_insight && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">💡 Aplicação prática</span>
+                      <p className="text-sm text-white/80 leading-relaxed">{result.synthesis.practical_insight}</p>
+                    </div>
+                  )}
                   {result.synthesis.search_tip && (
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 flex items-center gap-1.5 mb-1">
-                        <Zap size={10} /> DICA DE BUSCA
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">
+                        <Zap size={10} className="inline mr-1" />Dica de busca
                       </span>
-                      <p className="text-[11px] text-white/60">{result.synthesis.search_tip}</p>
+                      <p className="text-xs text-white/60">{result.synthesis.search_tip}</p>
+                    </div>
+                  )}
+                  {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">🔍 Recortes dos estudos</span>
+                      <div className="space-y-2">
+                        {result.synthesis.study_recortes.map((r, i) => (
+                          <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/10 text-xs text-white/70 leading-relaxed">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* AI WARNING */}
@@ -1049,6 +1242,29 @@ const ResultsView = ({
             {/* VERIFICATION GUIDE */}
             <VerificationGuide />
 
+            {/* SORT */}
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="text-xs text-muted-foreground font-semibold">Ordenar:</span>
+              {([
+                { id: "relevancia", label: "Relevância" },
+                { id: "recentes", label: "Mais recentes" },
+                { id: "evidencia", label: "Maior evidência" },
+                { id: "citacoes", label: "Mais citados" },
+              ] as const).map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSortOrder(s.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                    sortOrder === s.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-foreground/10 text-muted-foreground hover:border-primary/30"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
             {/* FILTERS */}
             <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
               <span className="text-muted-foreground font-semibold">
@@ -1059,6 +1275,9 @@ const ResultsView = ({
               </label>
               <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer">
                 <input type="checkbox" className="rounded accent-primary" checked={oaFilter} onChange={(e) => setOaFilter(e.target.checked)} /> Acesso aberto
+              </label>
+              <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer">
+                <input type="checkbox" className="rounded accent-primary" checked={ptEsFilter} onChange={(e) => setPtEsFilter(e.target.checked)} /> Priorizar PT/ES
               </label>
               <span className="text-muted-foreground">Nota mín.</span>
               <div className="flex gap-0.5">
@@ -1110,24 +1329,45 @@ const ResultsView = ({
 
             {/* ARTICLES */}
             <div className="space-y-4">
-              {filteredArticles.map((art, i) => (
+              {filteredArticles.slice(0, displayCount).map((art) => (
                 <ArticleCard
-                  key={i}
+                  key={art.doi || art.title}
                   article={art}
-                  saved={savedArticles.includes(art.title)}
-                  onSave={() => toggleSave(art.title)}
+                  saved={savedArticles.some((s) => s.title === art.title)}
+                  onSave={() => toggleSave(art)}
                 />
               ))}
             </div>
 
             {/* LOAD MORE */}
             <div className="mt-8 flex flex-col items-center gap-3">
-              <button
-                onClick={() => onSearch(query)}
-                className="bg-card/60 border border-foreground/10 hover:border-primary/30 px-8 py-3 rounded-2xl text-sm font-semibold text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2"
-              >
-                <Search size={16} /> Buscar mais artigos sobre este tema
-              </button>
+              {displayCount < filteredArticles.length ? (
+                <button
+                  onClick={() => {
+                    if (loadMoreLoading) return;
+                    setLoadMoreLoading(true);
+                    setTimeout(() => {
+                      setLoadMoreLoading(false);
+                      setDisplayCount((prev) => Math.min(prev + 5, filteredArticles.length));
+                    }, 1200);
+                  }}
+                  className="bg-card/60 border border-foreground/10 hover:border-primary/30 px-8 py-3 rounded-2xl text-sm font-semibold text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2"
+                >
+                  {loadMoreLoading
+                    ? <><Loader2 size={16} className="animate-spin" /> Buscando mais artigos...</>
+                    : <><Search size={16} /> Carregar mais {Math.min(5, filteredArticles.length - displayCount)} artigos</>
+                  }
+                </button>
+              ) : (
+                <div className="text-center space-y-1">
+                  <p className="text-xs text-emerald-500 font-semibold">
+                    ✓ Você está vendo todos os {filteredArticles.length} artigos analisados nesta busca.
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Para resultados de buscas diferentes, use a barra de pesquisa acima.
+                  </p>
+                </div>
+              )}
               <p className="text-[10px] text-muted-foreground">
                 {searchesLeft} buscas restantes · <button onClick={() => setShowPlans(true)} className="text-primary hover:underline">Upgrade para mais</button>
               </p>
@@ -1136,9 +1376,20 @@ const ResultsView = ({
         )}
       </main>
 
-      {/* Floating Bot */}
-      <button className="fixed bottom-6 right-6 bg-primary text-primary-foreground p-4 rounded-full shadow-2xl hover:brightness-110 active:scale-[0.95] transition-all z-50">
-        <Bot size={24} />
+      {/* Saved toast */}
+      {savedToast && (
+        <div className="fixed bottom-24 right-6 bg-foreground text-background text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl z-50 pointer-events-none">
+          {savedToast}
+        </div>
+      )}
+
+      {/* Floating Feedback Button */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        aria-label="Feedback e suporte"
+        className="fixed bottom-6 right-6 bg-primary text-primary-foreground p-4 rounded-full shadow-2xl hover:brightness-110 active:scale-[0.95] transition-all z-50"
+      >
+        <MessageSquarePlus size={24} />
       </button>
     </div>
   );

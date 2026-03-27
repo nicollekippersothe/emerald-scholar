@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { ExternalLink, ChevronDown, Copy, Check, MessageCircle, Bookmark, BookmarkCheck, Unlock } from "lucide-react";
+import { useState, useRef, useEffect, memo } from "react";
+import { ChevronDown, Copy, Check, MessageCircle, Bookmark, BookmarkCheck, Unlock } from "lucide-react";
 import type { Article } from "@/data/mockDatabase";
 import { STUDY_TYPE_MAP, EVIDENCE_LABELS } from "@/data/mockDatabase";
 
@@ -98,13 +98,15 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
   };
 
   return (
-    <div
+    <article
       className="bg-card rounded-2xl shadow-sm border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-md overflow-hidden"
-      style={{ animationDelay: `${index * 80}ms` }}
+      aria-label={article.title}
     >
       {/* Collapsed Header */}
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-controls={`article-body-${article.doi}`}
         className="w-full text-left p-5 sm:p-6 flex items-start justify-between gap-4"
       >
         <div className="flex-1 min-w-0">
@@ -140,6 +142,7 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
               e.stopPropagation();
               onSave(article);
             }}
+            aria-label={saved ? "Remover dos salvos" : "Salvar artigo"}
             className={`p-1.5 rounded-lg border transition-colors ${
               saved
                 ? "border-primary/30 bg-primary/5 text-primary"
@@ -157,7 +160,7 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="px-5 sm:px-6 pb-6 border-t border-border pt-5 space-y-5">
+        <div id={`article-body-${article.doi}`} className="px-5 sm:px-6 pb-6 border-t border-border pt-5 space-y-5">
           {/* Badges row */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] text-muted-foreground">
@@ -212,6 +215,7 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
                 </h5>
                 <button
                   onClick={copyAbnt}
+                  aria-label="Copiar referência ABNT"
                   className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                     copiedAbnt
                       ? "border-[hsl(var(--success-border))] bg-[hsl(var(--success-bg))] text-[hsl(var(--success-text))]"
@@ -230,31 +234,17 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-2">
-            <a
-              href={`https://doi.org/${article.doi}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-            >
-              <ExternalLink size={12} /> Ver artigo
-            </a>
             {article.doi && (
-              <a
-                href={`https://doi.org/${article.doi}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors"
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-mono px-3 py-2 rounded-lg border border-border text-muted-foreground bg-muted/50 select-all cursor-default"
+                title="DOI demonstrativo — verifique no artigo original"
               >
-                🔗 DOI
-              </a>
-            )}
-            {article.is_oa && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-primary/20 text-primary bg-primary/5">
-                📄 PDF disponível
+                DOI: {article.doi}
               </span>
             )}
             <button
               onClick={() => setShowChat(!showChat)}
+              aria-label={showChat ? "Fechar chat com IA" : "Perguntar à IA sobre este artigo"}
               className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-colors ${
                 showChat
                   ? "border-primary/30 bg-primary/5 text-primary"
@@ -342,8 +332,9 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 };
 
-export default ArticleCard;
+const ArticleCardMemo = memo(ArticleCard);
+export default ArticleCardMemo;

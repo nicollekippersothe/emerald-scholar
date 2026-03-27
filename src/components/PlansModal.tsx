@@ -1,11 +1,22 @@
 import { useState } from "react";
 import { X, CheckCircle2, Copy, Check } from "lucide-react";
 
-const PLANS = [
-  { name: "Gratuito", price: "R$ 0", period: "/mês", features: ["3 buscas/dia", "Resumo básico", "Referência ABNT", "1 base de dados"], cta: "Plano atual", disabled: true, code: "" },
-  { name: "Estudante", price: "R$ 29", period: "/mês", features: ["30 buscas/dia", "Consenso completo", "ABNT + APA + Vancouver", "7 bases simultâneas", "Split PDF (5/mês)", "Exportar referências"], cta: "Assinar Estudante", disabled: false, code: "SCHOLAR-EST-2024", highlight: false },
-  { name: "Pesquisador", price: "R$ 59", period: "/mês", features: ["Buscas ilimitadas", "Todas as análises", "Todos os formatos de ref.", "7 bases + arXiv preprints", "Split PDF ilimitado", "Auditoria de fontes", "API de integração", "Suporte prioritário"], cta: "Assinar Pesquisador", disabled: false, code: "SCHOLAR-PRO-2024", highlight: true },
-  { name: "Institucional", price: "R$ 199", period: "/mês", features: ["Até 20 usuários", "Tudo do Pesquisador", "Dashboard admin", "Relatórios de uso", "SSO institucional", "Faturamento por CNPJ"], cta: "Falar com vendas", disabled: false, code: "SCHOLAR-INST-2024", highlight: false },
+type Plan = {
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+  cta: string;
+  disabled: boolean;
+  code: string;
+  highlight?: boolean;
+  contactLink?: string;
+};
+
+const PLANS: Plan[] = [
+  { name: "Gratuito", price: "R$ 0", period: "/mês", features: ["3 buscas/dia", "Resumo básico", "Referência ABNT", "11 bases simultâneas", "Salvar artigos"], cta: "Plano atual", disabled: true, code: "" },
+  { name: "Estudante", price: "R$ 6,00", period: "/mês", features: ["30 buscas/dia", "Consenso completo", "Referência ABNT", "11 bases simultâneas", "Análise de consenso", "Índice de confiabilidade", "Salvar artigos"], cta: "Assinar Estudante", disabled: false, code: "SCHOLAR-EST-2024", highlight: false },
+  { name: "Pesquisador", price: "R$ 26,00", period: "/mês", features: ["Buscas ilimitadas", "Todas as análises", "Referência ABNT", "11 bases + arXiv preprints", "Análise de consenso avançada", "Índice de confiabilidade", "Salvar artigos ilimitados", "Acesso antecipado a novos recursos"], cta: "Assinar Pesquisador", disabled: false, code: "SCHOLAR-PRO-2024", highlight: true },
 ];
 
 const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
@@ -30,7 +41,7 @@ const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) =
             <X size={20} className="text-muted-foreground" />
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
@@ -69,18 +80,27 @@ const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) =
                   </div>
                 </div>
               )}
-              <button
-                disabled={plan.disabled}
-                className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  plan.disabled
-                    ? "bg-foreground/5 text-muted-foreground cursor-not-allowed"
-                    : plan.highlight
-                    ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.98]"
-                    : "bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98]"
-                }`}
-              >
-                {plan.cta}
-              </button>
+              {plan.contactLink ? (
+                <a
+                  href={plan.contactLink}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold transition-all bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98] block text-center"
+                >
+                  {plan.cta}
+                </a>
+              ) : (
+                <button
+                  disabled={plan.disabled}
+                  className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    plan.disabled
+                      ? "bg-foreground/5 text-muted-foreground cursor-not-allowed"
+                      : plan.highlight
+                      ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.98]"
+                      : "bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98]"
+                  }`}
+                >
+                  {plan.cta}
+                </button>
+              )}
             </div>
           ))}
         </div>

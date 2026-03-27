@@ -1,26 +1,23 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import {
   BookOpen,
   BrainCircuit,
   ArrowRight,
   BotMessageSquare,
-  Bot,
+  MessageSquarePlus,
   X,
-  Search,
   Database,
   BarChart3,
   Gauge,
   FileText,
   Link2,
   FileSearch,
-  Sparkles,
-  Lightbulb,
-  AlertTriangle,
-  CheckCircle2,
 } from "lucide-react";
 import { findMatch, type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
 import PlansModal from "@/components/PlansModal";
+import FeedbackModal from "@/components/FeedbackModal";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -34,52 +31,134 @@ const SC_BADGES = [
   { name: "BASE", color: "#8B5CF6" },
   { name: "Lens.org", color: "#06B6D4" },
   { name: "CORE", color: "#D97706" },
+  { name: "Cochrane", color: "#7C3AED" },
+  { name: "BVS/LILACS", color: "#059669" },
 ];
 
 const QUICK_SEARCHES = [
-  "retinol reduz linhas finas em adultos?",
-  "exercício aeróbico melhora depressão clínica?",
+  "exercício aeróbico reduz sintomas de depressão clínica?",
+  "microbiota intestinal influencia saúde mental?",
+  "CRISPR-Cas9 eficácia em terapia gênica humana",
   "sono fragmentado aumenta risco de Alzheimer?",
-  "meditação mindfulness reduz ansiedade?",
-  "probióticos melhoram saúde intestinal?",
-  "redes sociais causam vício em dopamina?",
+  "mindfulness reduz ansiedade em universitários?",
+  "resistência antimicrobiana: origem animal e humana",
 ];
 
 const FEATURES = [
-  { icon: Database, title: "11 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO, arXiv, Europe PMC, BASE, Lens.org e CORE." },
+  { icon: Database, title: "13 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO, arXiv, Europe PMC, BASE, Lens.org, CORE, Cochrane e BVS/LILACS." },
   { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
   { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
   { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
   { icon: Link2, title: "DOI verificável", desc: "Link direto para o artigo oficial antes de citar." },
-  { icon: FileSearch, title: "Dissecar PDF", desc: "Envie qualquer artigo e receba objetivo, amostra, p-valor e limitações." },
+  { icon: FileSearch, title: "Dissecar PDF", desc: "Em breve: envie qualquer artigo e receba objetivo, amostra, p-valor e limitações." },
 ];
 
 const Index = () => {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<MockEntry | null>(null);
   const [loading, setLoading] = useState(false);
-  const [searchesLeft, setSearchesLeft] = useState(3);
+  const [searchesLeft, setSearchesLeft] = useState(() => {
+    try {
+      const stored = localStorage.getItem("sl_searches_left");
+      return stored !== null ? Math.max(0, parseInt(stored, 10)) : 3;
+    } catch { return 3; }
+  });
   const [showPlans, setShowPlans] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [synthesisLoading, setSynthesisLoading] = useState(false);
 
-  const handleSearch = (searchTerm: string) => {
+  const handleSearch = async (searchTerm: string, options?: { lang?: string }) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
+    setSynthesisLoading(false);
+    setResult(null);
     setQuery(searchTerm);
-    setTimeout(() => {
-      setResult(findMatch(searchTerm));
+
+    try {
+      // Fase 1: Busca artigos (rápido — Semantic Scholar)
+      const langParam = options?.lang ? `&lang=${encodeURIComponent(options.lang)}` : "";
+      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}${langParam}`);
+
+      if (!searchRes.ok) throw new Error("API de busca indisponível");
+
+      const { count, articles } = await searchRes.json();
+
+      // Mostrar artigos imediatamente com síntese provisória
+      setResult({
+        keywords: [searchTerm],
+        count: count ?? articles.length,
+        articles,
+        synthesis: {
+          direct_answer: "",
+          consensus_agree: 0,
+          consensus_inconclusive: 100,
+          consensus_contradict: 0,
+          confidence_level: "média",
+          confidence_score: 60,
+          confidence_reasons: [],
+          inconclusive_summary: "",
+          contradict_explanation: "",
+          practical_insight: "",
+          search_tip: "",
+          maturity_label: "Evidência emergente",
+        },
+      });
       setLoading(false);
-      setSearchesLeft((prev) => Math.max(0, prev - 1));
-    }, 1200);
+      setSynthesisLoading(true);
+
+      // Fase 2: Síntese por IA (pode demorar — LLM)
+      const sumRes = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchTerm, articles }),
+      });
+
+      let synthesis;
+      if (sumRes.ok) {
+        const sumData = await sumRes.json();
+        synthesis = sumData.synthesis;
+      } else {
+        synthesis = {
+          direct_answer: `Encontrados ${count ?? articles.length} estudos para "${searchTerm}". Consulte os artigos abaixo para análise detalhada.`,
+          consensus_agree: 0,
+          consensus_inconclusive: 100,
+          consensus_contradict: 0,
+          confidence_level: "média",
+          confidence_score: 60,
+          confidence_reasons: ["Resultados de múltiplas bases científicas", "Síntese automática indisponível temporariamente"],
+          inconclusive_summary: "Análise de consenso indisponível. Consulte os artigos individualmente.",
+          contradict_explanation: "",
+          practical_insight: "Refine a busca com termos mais específicos para melhores resultados.",
+          search_tip: "Adicione população-alvo, desfecho ou período temporal à sua busca.",
+          maturity_label: "Evidência emergente",
+        };
+      }
+
+      setResult((prev) => prev ? { ...prev, synthesis } : prev);
+    } catch (err) {
+      // Fallback completo para mock local
+      console.warn("[handleSearch] API indisponível, usando mock:", err);
+      setLoading(false);
+      setResult(findMatch(searchTerm));
+    } finally {
+      setSynthesisLoading(false);
+      setSearchesLeft((prev) => {
+        const next = Math.max(0, prev - 1);
+        try { localStorage.setItem("sl_searches_left", String(next)); } catch {}
+        return next;
+      });
+    }
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    handleSearch(query);
+    void handleSearch(query);
   };
 
   const handleBack = () => {
     setResult(null);
     setQuery("");
+    setSynthesisLoading(false);
   };
 
   // ── RESULTS VIEW ──
@@ -93,6 +172,7 @@ const Index = () => {
         onSubmit={handleSubmit}
         onSearch={handleSearch}
         onBack={handleBack}
+        synthesisLoading={synthesisLoading}
       />
     );
   }
@@ -103,7 +183,7 @@ const Index = () => {
       <header className="flex items-center justify-between px-5 py-3 border-b border-foreground/10">
         <div className="flex items-center gap-3">
           <BrainCircuit className="text-primary size-6" />
-          <button onClick={handleBack} className="flex items-center">
+          <button onClick={handleBack} aria-label="Voltar para o início" className="flex items-center">
             <h1 className="text-xl font-extrabold tracking-tight">
               Scholar<span className="text-primary">IA</span>
             </h1>
@@ -113,6 +193,12 @@ const Index = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            to="/fontes"
+            className="hidden sm:block border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+          >
+            Nossas Fontes
+          </Link>
           <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes
           </div>
@@ -126,6 +212,7 @@ const Index = () => {
       </header>
 
       <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+      <FeedbackModal open={showFeedback} onClose={() => setShowFeedback(false)} />
 
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
@@ -140,7 +227,7 @@ const Index = () => {
           </h2>
 
           <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
-            Busca em 11 bases simultâneas, filtra os artigos revisados por
+            Busca em 13 bases simultâneas, filtra os artigos revisados por
             especialistas e mostra o nível de confiabilidade de cada fonte.
           </p>
 
@@ -155,12 +242,13 @@ const Index = () => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="existe telepatia?"
+                placeholder="Ex: Impacto da microbiota intestinal na saúde mental: uma revisão sistemática"
                 className="w-full py-3 pl-12 pr-10 rounded-xl bg-background/50 border border-foreground/10 text-base placeholder:text-muted-foreground focus:ring-2 focus:ring-primary outline-none"
               />
               {query && (
                 <button
                   type="button"
+                  aria-label="Limpar busca"
                   onClick={() => setQuery("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
@@ -189,7 +277,7 @@ const Index = () => {
             <>
               <div className="flex items-center gap-6 text-sm text-muted-foreground mb-8">
                 <span>{searchesLeft} buscas gratuitas, sem cadastro</span>
-                <button className="flex items-center gap-2 hover:text-foreground transition-colors">
+                <button onClick={() => setShowPlans(true)} className="flex items-center gap-2 hover:text-foreground transition-colors">
                   <BotMessageSquare size={16} /> Analisar um PDF
                 </button>
               </div>
@@ -277,70 +365,15 @@ const Index = () => {
           </section>
         )}
 
-        {/* SPLIT PDF SECTION */}
-        {!loading && (
-          <section className="w-full px-6 pb-20">
-            <div className="max-w-5xl mx-auto">
-              <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-0">
-                {/* Left */}
-                <div className="p-8 md:p-10">
-                  <span className="bg-primary/20 text-primary px-3 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 mb-4">
-                    <FileSearch size={14} /> SPLIT PDF
-                  </span>
-                  <h4 className="text-2xl font-extrabold text-white mb-1">
-                    Já tem um artigo
-                  </h4>
-                  <h4 className="text-2xl font-extrabold text-primary italic mb-4">
-                    em mãos?
-                  </h4>
-                  <p className="text-white/70 text-sm leading-relaxed mb-6">
-                    Envie o PDF e a IA divide em blocos de fatos puros: objetivo,
-                    amostra, resultado principal, p-valor, conflito de interesse e
-                    limitações até as que os autores não declararam.
-                  </p>
-                  <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold text-sm hover:brightness-110 active:scale-[0.97] transition-all inline-flex items-center gap-2">
-                    Dissecar artigo <ArrowRight size={16} />
-                  </button>
-                </div>
-                {/* Right */}
-                <div className="p-8 md:p-10 flex flex-col justify-center gap-6">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="text-primary shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <h5 className="font-bold text-white text-sm">Resultado principal</h5>
-                      <p className="text-white/50 text-xs">
-                        O que foi encontrado, se é estatisticamente significativo (p-valor) e o tamanho real do efeito.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <h5 className="font-bold text-white text-sm">Limitações não declaradas</h5>
-                      <p className="text-white/50 text-xs">
-                        Problemas que os próprios autores não mencionaram.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="text-emerald-400 shrink-0 mt-0.5" size={18} />
-                    <div>
-                      <h5 className="font-bold text-white text-sm">Financiamento e viés</h5>
-                      <p className="text-white/50 text-xs">
-                        Quem financiou o estudo? Há conflito de interesse?
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
       </main>
 
-      {/* Floating Bot Button */}
-      <button className="fixed bottom-6 right-6 bg-primary text-primary-foreground p-4 rounded-full shadow-2xl hover:brightness-110 active:scale-[0.95] transition-all z-50">
-        <Bot size={24} />
+      {/* Floating Feedback Button */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        aria-label="Feedback e suporte"
+        className="fixed bottom-6 right-6 bg-primary text-primary-foreground p-4 rounded-full shadow-2xl hover:brightness-110 active:scale-[0.95] transition-all z-50"
+      >
+        <MessageSquarePlus size={24} />
       </button>
     </div>
   );
