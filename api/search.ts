@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const S2_BASE = "https://api.semanticscholar.org/graph/v1";
 const S2_FIELDS =
-  "title,authors,year,abstract,citationCount,isOpenAccess,externalIds,venue,openAccessPdf,publicationTypes";
+  "paperId,title,authors,year,abstract,citationCount,isOpenAccess,externalIds,venue,openAccessPdf,publicationTypes";
 
 // Map external IDs / venue to one of our 13 source badges
 function detectSource(paper: S2Paper): string {
@@ -47,7 +47,7 @@ function detectStudyType(types: string[] | undefined): string {
 }
 
 interface S2Paper {
-  paperId: string;
+  paperId?: string;
   title: string;
   abstract?: string;
   year?: number;
@@ -135,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           citations_weight: Math.min(100, Math.floor((p.citationCount ?? 0) / 10)),
         },
         ...(p.openAccessPdf?.url ? { pdf_url: p.openAccessPdf.url } : {}),
+        ...(p.paperId ? { url: `https://www.semanticscholar.org/paper/${p.paperId}` } : {}),
       };
     });
 

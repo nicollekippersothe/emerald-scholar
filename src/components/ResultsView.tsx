@@ -38,18 +38,10 @@ import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDEN
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
-  { name: "OpenAlex", color: "#3B82F6" },
   { name: "Semantic Scholar", color: "#A78BFA" },
-  { name: "CrossRef", color: "#2DD4BF" },
-  { name: "DOAJ", color: "#38BDF8" },
+  { name: "Cochrane", color: "#7C3AED" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
-  { name: "Europe PMC", color: "#E11D48" },
-  { name: "BASE", color: "#8B5CF6" },
-  { name: "Lens.org", color: "#06B6D4" },
-  { name: "CORE", color: "#D97706" },
-  { name: "Cochrane", color: "#7C3AED" },
-  { name: "BVS/LILACS", color: "#059669" },
 ];
 
 const TABS = [
@@ -275,24 +267,48 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
 
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        {article.doi && (
-          article.isMock ? (
-            <span
-              title="Artigo de Demonstração — DOI de exemplo, link indisponível"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-not-allowed opacity-75"
-            >
-              <AlertTriangle size={12} /> Demo (DOI indisponível)
-            </span>
-          ) : (
-            <a
-              href={`https://doi.org/${article.doi}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-            >
-              <ExternalLink size={12} /> Ver artigo
-            </a>
-          )
+        {/* Artigo mock → badge de demonstração */}
+        {article.isMock && (
+          <span
+            title="Dados de demonstração — este artigo é simulado para fins de demonstração"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-help"
+          >
+            <AlertTriangle size={12} /> Demonstração
+          </span>
+        )}
+        {/* Artigos reais: Semantic Scholar como link primário */}
+        {!article.isMock && article.url && (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+          >
+            <ExternalLink size={12} /> Ver artigo
+          </a>
+        )}
+        {/* DOI como link secundário quando disponível */}
+        {!article.isMock && article.doi && (
+          <a
+            href={`https://doi.org/${article.doi}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
+            title={`DOI: ${article.doi}`}
+          >
+            <ExternalLink size={12} /> DOI
+          </a>
+        )}
+        {/* Fallback Google Scholar: mock ou artigo real sem url e sem doi */}
+        {(article.isMock || (!article.url && !article.doi)) && (
+          <a
+            href={`https://scholar.google.com/scholar?q=${encodeURIComponent(article.title)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
+          >
+            <Search size={12} /> Buscar no Scholar
+          </a>
         )}
         {article.is_oa && article.pdf_url && (
           <a
@@ -1007,6 +1023,20 @@ const ResultsView = ({
           <>
             {/* ASYNC SOURCE LOADING */}
             <SourceLoadingIndicator loadedSources={loadedSources} />
+
+            {/* BANNER: MODO DEMONSTRAÇÃO */}
+            {result.articles.some((a) => a.isMock) && (
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm mb-4">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold mb-0.5">Modo demonstração — busca em tempo real indisponível</p>
+                  <p className="text-xs text-amber-400/80">
+                    A API de busca não respondeu e o sistema carregou dados de exemplo.
+                    Os artigos abaixo são simulados. Use "Buscar no Scholar" para acessar publicações reais.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* QUERY INTENTION INDICATOR */}
             <div className={`rounded-2xl p-4 mb-6 border ${

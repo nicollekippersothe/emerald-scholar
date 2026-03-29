@@ -14,25 +14,17 @@ import {
   Link2,
   FileSearch,
 } from "lucide-react";
-import { findMatch, type MockEntry } from "@/data/mockDatabase";
+import { type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
 import PlansModal from "@/components/PlansModal";
 import FeedbackModal from "@/components/FeedbackModal";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
-  { name: "OpenAlex", color: "#3B82F6" },
   { name: "Semantic Scholar", color: "#A78BFA" },
-  { name: "CrossRef", color: "#2DD4BF" },
-  { name: "DOAJ", color: "#38BDF8" },
+  { name: "Cochrane", color: "#7C3AED" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
-  { name: "Europe PMC", color: "#E11D48" },
-  { name: "BASE", color: "#8B5CF6" },
-  { name: "Lens.org", color: "#06B6D4" },
-  { name: "CORE", color: "#D97706" },
-  { name: "Cochrane", color: "#7C3AED" },
-  { name: "BVS/LILACS", color: "#059669" },
 ];
 
 const QUICK_SEARCHES = [
@@ -45,7 +37,7 @@ const QUICK_SEARCHES = [
 ];
 
 const FEATURES = [
-  { icon: Database, title: "13 bases simultâneas", desc: "PubMed, OpenAlex, Semantic Scholar, CrossRef, DOAJ, SciELO, arXiv, Europe PMC, BASE, Lens.org, CORE, Cochrane e BVS/LILACS." },
+  { icon: Database, title: "Principais bases científicas", desc: "PubMed, Semantic Scholar, Cochrane, SciELO, arXiv e mais — publicações indexadas nas fontes mais relevantes da ciência." },
   { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
   { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
   { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
@@ -66,12 +58,14 @@ const Index = () => {
   const [showPlans, setShowPlans] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const handleSearch = async (searchTerm: string, options?: { lang?: string }) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
     setSynthesisLoading(false);
     setResult(null);
+    setSearchError(null);
     setQuery(searchTerm);
 
     try {
@@ -136,10 +130,9 @@ const Index = () => {
 
       setResult((prev) => prev ? { ...prev, synthesis } : prev);
     } catch (err) {
-      // Fallback completo para mock local
-      console.warn("[handleSearch] API indisponível, usando mock:", err);
+      console.warn("[handleSearch] API indisponível:", err);
       setLoading(false);
-      setResult(findMatch(searchTerm));
+      setSearchError("Não foi possível conectar à base de dados. Verifique sua conexão e tente novamente.");
     } finally {
       setSynthesisLoading(false);
       setSearchesLeft((prev) => {
@@ -227,7 +220,7 @@ const Index = () => {
           </h2>
 
           <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
-            Busca em 13 bases simultâneas, filtra os artigos revisados por
+            Inclui publicações de PubMed, Cochrane, SciELO, arXiv e outras — filtra os artigos revisados por
             especialistas e mostra o nível de confiabilidade de cada fonte.
           </p>
 
@@ -269,6 +262,13 @@ const Index = () => {
             <div className="text-center py-12 flex flex-col items-center gap-4 text-primary font-bold animate-pulse text-xl">
               <BrainCircuit className="size-12 animate-spin" />
               Analisando bases científicas...
+            </div>
+          )}
+
+          {/* ERROR */}
+          {searchError && !loading && (
+            <div className="text-center py-8 flex flex-col items-center gap-2 text-destructive">
+              <p className="font-semibold">{searchError}</p>
             </div>
           )}
 

@@ -42,6 +42,7 @@ export interface Article {
   confidence_score: number;
   confidence_factors: ConfidenceFactors;
   pdf_url?: string;
+  url?: string;
   /** true quando o artigo veio do mockDatabase (demonstração) — não é dado real */
   isMock?: boolean;
 }
