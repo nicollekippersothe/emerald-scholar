@@ -23,6 +23,7 @@ interface SynthesisPanelProps {
   queryType: QueryType;
   articles: Article[];
   synthesisLoading?: boolean;
+  synthesisFailed?: boolean;
 }
 
 const VENUE_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -121,6 +122,7 @@ const SynthesisPanel = ({
   queryType,
   articles,
   synthesisLoading = false,
+  synthesisFailed = false,
 }: SynthesisPanelProps) => {
   const [activeTab, setActiveTab] = useState<"distribuicao" | "detalhes" | "insights">("distribuicao");
   const [activeCite, setActiveCite] = useState<number | null>(null);
@@ -270,14 +272,14 @@ const SynthesisPanel = ({
         </div>
 
         {/* Consensus block — highlighted */}
-        <div className="border-l-4 border-blue-500 bg-blue-950/30 rounded-r-xl pl-4 pr-4 py-4 mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BrainCircuit size={13} className="text-blue-400 shrink-0" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
-              Consenso da Ciência
-            </span>
-          </div>
-          {synthesisLoading ? (
+        {synthesisLoading ? (
+          <div className="border-l-4 border-blue-500/50 bg-blue-950/20 rounded-r-xl pl-4 pr-4 py-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BrainCircuit size={13} className="text-blue-400/60 shrink-0 animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/60">
+                Gerando consenso da ciência...
+              </span>
+            </div>
             <div className="space-y-2.5 animate-pulse">
               <div className="h-3 bg-slate-700/80 rounded-full w-full" />
               <div className="h-3 bg-slate-700/80 rounded-full w-[94%]" />
@@ -285,17 +287,35 @@ const SynthesisPanel = ({
               <div className="h-3 bg-slate-700/80 rounded-full w-[88%]" />
               <div className="h-3 bg-slate-700/80 rounded-full w-[65%]" />
             </div>
-          ) : (
+          </div>
+        ) : synthesisFailed ? (
+          <div className="border border-dashed border-slate-700/60 bg-slate-800/20 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
+            <BrainCircuit size={15} className="text-slate-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-0.5">Síntese IA indisponível</p>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                A síntese por IA não foi gerada para esta busca. Consulte os artigos abaixo — cada um possui seu resumo e nível de evidência.
+              </p>
+            </div>
+          </div>
+        ) : synthesisText ? (
+          <div className="border-l-4 border-blue-500 bg-blue-950/30 rounded-r-xl pl-4 pr-4 py-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BrainCircuit size={13} className="text-blue-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
+                Consenso da Ciência
+              </span>
+            </div>
             <p className="text-sm text-slate-100 leading-relaxed">
               {renderWithCitations(synthesisText, activeCite, handleCiteClick)}
             </p>
-          )}
-          {hasInlineCitations && !synthesisLoading && (
-            <p className="text-[10px] text-slate-600 mt-2.5 pt-2 border-t border-slate-700/40">
-              Toque em [N] para destacar a fonte citada no painel lateral
-            </p>
-          )}
-        </div>
+            {hasInlineCitations && (
+              <p className="text-[10px] text-slate-600 mt-2.5 pt-2 border-t border-slate-700/40">
+                Toque em [N] para destacar a fonte citada no painel lateral
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* ── Body: two-column layout ── */}
@@ -456,8 +476,8 @@ const SynthesisPanel = ({
           )}
         </div>
 
-        {/* ── Right: Cited Sources sidebar ── */}
-        <div className="lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-slate-700/40 bg-slate-900/30 px-4 py-4">
+        {/* ── Right: Cited Sources sidebar — only when synthesis available ── */}
+        <div className={`lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-slate-700/40 bg-slate-900/30 px-4 py-4 ${synthesisFailed ? "hidden lg:hidden" : ""}`}>
           <div className="flex items-center gap-2 mb-3">
             <BookOpen size={13} className="text-blue-400" />
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">

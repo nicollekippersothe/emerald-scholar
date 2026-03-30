@@ -76,6 +76,7 @@ interface ResultsViewProps {
   onSearch: (term: string, options?: { lang?: string }) => void;
   onBack: () => void;
   synthesisLoading?: boolean;
+  synthesisFailed?: boolean;
 }
 
 /* ── Hallucination-filtered chat answer ── */
@@ -870,6 +871,7 @@ const ResultsView = ({
   onSearch,
   onBack,
   synthesisLoading = false,
+  synthesisFailed = false,
 }: ResultsViewProps) => {
   const queryIntention = useQueryIntention(query);
   const [activeTab, setActiveTab] = useState("search");
@@ -1201,6 +1203,7 @@ const ResultsView = ({
               queryType={queryIntention.mode === "consensus" ? "hypothesis" : "broad"}
               articles={result.articles}
               synthesisLoading={synthesisLoading}
+              synthesisFailed={synthesisFailed}
             />
 
             {/* AI WARNING */}

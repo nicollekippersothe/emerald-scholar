@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
+// Aumenta timeout da função Vercel de 10s → 60s (necessário para síntese com LLM)
+export const config = { maxDuration: 60 };
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-flash-1.5-free";
 
@@ -31,7 +34,8 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
 }
 
 function buildUserPrompt(query: string, articles: ArticleInput[]): string {
-  const top12 = articles.slice(0, 12);
+  // Limitar a 8 artigos para caber no contexto e reduzir latência
+  const top12 = articles.slice(0, 8);
 
   const articlesList = top12
     .map((a, i) => {

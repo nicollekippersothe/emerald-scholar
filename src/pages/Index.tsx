@@ -58,12 +58,14 @@ const Index = () => {
   const [showPlans, setShowPlans] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const handleSearch = async (searchTerm: string, options?: { lang?: string }) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
     setSynthesisLoading(false);
+    setSynthesisFailed(false);
     setResult(null);
     setSearchError(null);
     setQuery(searchTerm);
@@ -108,25 +110,29 @@ const Index = () => {
       });
 
       let synthesis;
+      let failed = false;
       if (sumRes.ok) {
         const sumData = await sumRes.json();
         synthesis = sumData.synthesis;
       } else {
+        failed = true;
+        // Síntese mínima — sem texto genérico que polui o painel
         synthesis = {
-          direct_answer: `Encontrados ${count ?? articles.length} estudos para "${searchTerm}". Consulte os artigos abaixo para análise detalhada.`,
+          direct_answer: "",
           consensus_agree: 0,
           consensus_inconclusive: 100,
           consensus_contradict: 0,
           confidence_level: "média",
           confidence_score: 60,
-          confidence_reasons: ["Resultados de múltiplas bases científicas", "Síntese automática indisponível temporariamente"],
-          inconclusive_summary: "Análise de consenso indisponível. Consulte os artigos individualmente.",
+          confidence_reasons: [],
+          inconclusive_summary: "",
           contradict_explanation: "",
-          practical_insight: "Refine a busca com termos mais específicos para melhores resultados.",
-          search_tip: "Adicione população-alvo, desfecho ou período temporal à sua busca.",
-          maturity_label: "Evidência emergente",
+          practical_insight: "",
+          search_tip: "",
+          maturity_label: undefined,
         };
       }
+      setSynthesisFailed(failed);
 
       setResult((prev) => prev ? { ...prev, synthesis } : prev);
     } catch (err) {
@@ -152,6 +158,7 @@ const Index = () => {
     setResult(null);
     setQuery("");
     setSynthesisLoading(false);
+    setSynthesisFailed(false);
   };
 
   // ── RESULTS VIEW ──
@@ -166,6 +173,7 @@ const Index = () => {
         onSearch={handleSearch}
         onBack={handleBack}
         synthesisLoading={synthesisLoading}
+        synthesisFailed={synthesisFailed}
       />
     );
   }
