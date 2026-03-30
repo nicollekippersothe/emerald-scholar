@@ -35,7 +35,7 @@ import PromoCodeModal from "@/components/PromoCodeModal";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import SynthesisPanel from "@/components/SynthesisPanel";
 import { useQueryIntention } from "@/hooks/useQueryIntention";
-import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
+import { type MockEntry, type Article, type ArticleSummary, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -132,12 +132,33 @@ const ScoreDots = ({ score }: { score: number }) => (
   </div>
 );
 
+/* ── Evidence level badge colors ── */
+const EVIDENCE_BADGE_CONFIG: Record<string, string> = {
+  "Meta-análise":                  "bg-purple-900/50 text-purple-300 border-purple-700/60",
+  "Revisão Sistemática":           "bg-violet-900/50 text-violet-300 border-violet-700/60",
+  "Ensaio Clínico Randomizado":    "bg-emerald-900/50 text-emerald-300 border-emerald-700/60",
+  "Estudo de Coorte":              "bg-blue-900/50 text-blue-300 border-blue-700/60",
+  "Estudo Transversal":            "bg-sky-900/50 text-sky-300 border-sky-700/60",
+  "Estudo Caso-Controle":          "bg-indigo-900/50 text-indigo-300 border-indigo-700/60",
+  "Preprint não revisado":         "bg-amber-900/50 text-amber-300 border-amber-700/60",
+  "Revisão Narrativa":             "bg-slate-800 text-slate-400 border-slate-700",
+  "Estudo Observacional":          "bg-slate-800 text-slate-400 border-slate-700",
+  "Relato de Caso":                "bg-rose-900/50 text-rose-300 border-rose-700/60",
+};
+
 /* ── Article Card with Chat ── */
-const ArticleCard = memo(({ article, onSave, saved, resumoPt }: { article: Article; onSave: () => void; saved: boolean; resumoPt?: string }) => {
+const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary }: {
+  article: Article;
+  onSave: () => void;
+  saved: boolean;
+  resumoPt?: string;
+  articleSummary?: ArticleSummary;
+}) => {
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [expandedAbstract, setExpandedAbstract] = useState(false);
+  const [summaryTab, setSummaryTab] = useState<"popular" | "tecnico">("popular");
   const [msgs, setMsgs] = useState<{ role: string; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -239,24 +260,85 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt }: { article: Artic
         )}
       </div>
 
-      {/* Abstract */}
+      {/* Evidence level badge (from AI article_summaries) */}
+      {articleSummary?.evidence_level_badge && (
+        <div className="mb-2">
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+              EVIDENCE_BADGE_CONFIG[articleSummary.evidence_level_badge] ?? "bg-slate-800 text-slate-400 border-slate-700"
+            }`}
+          >
+            🔬 {articleSummary.evidence_level_badge}
+          </span>
+        </div>
+      )}
+
+      {/* Abstract / AI Summary */}
       {(() => {
-        const aiSummary = resumoPt?.trim();
+        const hasAiSummary = !!(articleSummary?.resumo_popular || articleSummary?.resumo_tecnico);
         const rawAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
-        const displayText = aiSummary || rawAbstract;
-        const isAI = !!aiSummary;
-        const label = isAI ? "Resumo (IA)" : article.isMock ? "Resumo" : "Abstract";
+        const fallbackText = resumoPt?.trim() || rawAbstract;
 
         return (
           <div className="mb-3">
-            {displayText ? (
+            {hasAiSummary ? (
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">{label}</p>
+                {/* Tab switcher */}
+                <div className="flex gap-1 mb-2">
+                  <button
+                    onClick={() => setSummaryTab("popular")}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                      summaryTab === "popular"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-foreground/10 text-muted-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    🧑‍🎓 Para leigos
+                  </button>
+                  <button
+                    onClick={() => setSummaryTab("tecnico")}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                      summaryTab === "tecnico"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-foreground/10 text-muted-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    🔬 Técnico
+                  </button>
+                </div>
+
+                {summaryTab === "popular" && (
+                  <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
+                    <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
+                      Resumo popular (IA)
+                    </p>
+                    <p className="text-sm text-foreground/80 leading-relaxed">
+                      {articleSummary.resumo_popular || "Resumo não disponível."}
+                    </p>
+                  </div>
+                )}
+
+                {summaryTab === "tecnico" && (
+                  <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
+                    <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
+                      Resumo técnico (IA)
+                    </p>
+                    <p className="text-sm text-foreground/75 leading-relaxed font-mono text-xs">
+                      {articleSummary.resumo_tecnico || "Resumo técnico não disponível."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : fallbackText ? (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
+                  {resumoPt ? "Resumo (IA)" : article.isMock ? "Resumo" : "Abstract"}
+                </p>
                 <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
                   <p className={`text-sm text-foreground/75 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
-                    {displayText}
+                    {fallbackText}
                   </p>
-                  {displayText.length > 220 && (
+                  {fallbackText.length > 220 && (
                     <button
                       onClick={() => setExpandedAbstract(v => !v)}
                       className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
@@ -1219,7 +1301,10 @@ const ResultsView = ({
 
             {/* ARTICLES */}
             <div className="space-y-4">
-              {filteredArticles.slice(0, displayCount).map((art) => (
+              {filteredArticles.slice(0, displayCount).map((art) => {
+                const artIdx = result.articles.indexOf(art);
+                const doiKey = art.doi && art.doi !== "n/a" ? art.doi : `n/a-${artIdx + 1}`;
+                return (
                 <ArticleCard
                   key={art.doi || art.title}
                   article={art}
@@ -1227,10 +1312,15 @@ const ResultsView = ({
                   onSave={() => toggleSave(art)}
                   resumoPt={
                     result.synthesis.resumos_pt?.[art.doi] ||
-                    result.synthesis.resumos_pt?.[`n/a-${result.articles.indexOf(art)}`]
+                    result.synthesis.resumos_pt?.[`n/a-${artIdx + 1}`]
+                  }
+                  articleSummary={
+                    result.synthesis.article_summaries?.[doiKey] ||
+                    result.synthesis.article_summaries?.[`n/a-${artIdx + 1}`]
                   }
                 />
-              ))}
+                );
+              })}
             </div>
 
             {/* LOAD MORE */}

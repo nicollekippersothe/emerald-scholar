@@ -15,9 +15,13 @@ interface ArticleInput {
   journal?: string;
 }
 
-const SYSTEM_PROMPT = `Você é um assistente de pesquisa científica especializado em síntese de evidências.
-Recebe uma lista de artigos científicos e uma query de pesquisa, e retorna uma síntese estruturada em JSON.
-Responda APENAS com JSON válido, sem markdown, sem explicações fora do JSON.`;
+const SYSTEM_PROMPT = `Você é um Professor Doutor especialista em síntese de evidências científicas, com vasta experiência em revisões sistemáticas e meta-análises. Sua missão é gerar sínteses de nível acadêmico, claras, rigorosas e acessíveis.
+
+Regras absolutas:
+- Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON.
+- Toda síntese deve ser em Português do Brasil (PT-BR) fluído e científico.
+- Seja direto, preciso e nunca invente dados que não estejam nos abstracts fornecidos.
+- Em inline_synthesis: aponte divergências explicitamente ("Embora [N] aponte X, [M] sugere Y").`;
 
 function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" | "other" {
   if (a.source === "arXiv" || a.journal?.toLowerCase().includes("arxiv")) return "preprint";
@@ -29,12 +33,16 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
 function buildUserPrompt(query: string, articles: ArticleInput[]): string {
   const top12 = articles.slice(0, 12);
 
-  const articlesSummary = top12
+  const articlesList = top12
     .map((a, i) => {
       const venueType = classifyVenue(a);
-      const venueTag = venueType === "journal" ? "📰 Periódico" : venueType === "conference" ? "🎓 Conferência" : venueType === "preprint" ? "⚡ Preprint" : "📄 Outro";
+      const venueTag =
+        venueType === "journal" ? "📰 Periódico" :
+        venueType === "conference" ? "🎓 Conferência" :
+        venueType === "preprint" ? "⚡ Preprint" : "📄 Outro";
       const venue = a.journal ? ` | venue: ${a.journal}` : "";
-      return `[${i + 1}] doi:${a.doi || "n/a"} | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} citações, fonte: ${a.source}${venue} [${venueTag}]\nAbstract: ${a.abstract_pt?.slice(0, 350) ?? "N/A"}`;
+      const doiKey = a.doi && a.doi !== "n/a" ? a.doi : `n/a-${i + 1}`;
+      return `[${i + 1}] chave:"${doiKey}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., fonte: ${a.source}${venue} [${venueTag}]\nAbstract: ${a.abstract_pt?.slice(0, 400) ?? "N/A"}`;
     })
     .join("\n\n");
 
@@ -42,17 +50,17 @@ function buildUserPrompt(query: string, articles: ArticleInput[]): string {
 
   return `Query de pesquisa: "${query}"
 
-Artigos encontrados (priorize 📰 Periódicos e 🎓 Conferências peer-reviewed na síntese; sinalize ⚡ Preprints com menor peso):
-${articlesSummary}
+Artigos (priorize 📰 Periódicos e 🎓 Conferências na síntese; sinalize ⚡ Preprints com menor peso):
+${articlesList}
 
 ${
   isQuestion
-    ? `Como esta é uma pergunta de pesquisa, calcule as porcentagens de consenso:
-- consensus_agree: % dos estudos que respondem SIM / confirmam a proposição (0-100)
+    ? `Como esta é uma pergunta, calcule as porcentagens de consenso:
+- consensus_agree: % que respondem SIM / confirmam (0-100)
 - consensus_inconclusive: % inconclusivos (0-100)
 - consensus_contradict: % que contradizem (0-100)
 Os três devem somar exatamente 100.`
-    : `Como esta é uma busca temática (não uma pergunta), use:
+    : `Busca temática (não uma pergunta):
 - consensus_agree: 0
 - consensus_inconclusive: 100
 - consensus_contradict: 0`
@@ -60,45 +68,57 @@ Os três devem somar exatamente 100.`
 
 Retorne APENAS este JSON (sem markdown):
 {
-  "direct_answer": "Síntese direta em português (2-3 frases). Comece com 'Com base em X estudos analisados —'",
-  "inline_synthesis": "Síntese expandida em português (4-6 frases) onde CADA afirmação é acompanhada pela citação numérica [N] do artigo correspondente da lista. Ex: 'A suplementação de vitamina D mostrou redução de fraturas [1][3]. Uma meta-análise de Cochrane [2] identificou...' Use múltiplas citações quando relevante. Priorize artigos de periódicos. Se a fonte for em inglês, o texto deve ser em PT-BR fluído mas a citação mantém o número.",
+  "direct_answer": "Síntese direta em PT-BR (2-3 frases). Comece com 'Com base em X estudos analisados —'",
+  "inline_synthesis": "Parágrafo único de síntese científica (5-8 frases). Sintetize o que há de COMUM entre os estudos. Quando houver divergência, aponte EXPLICITAMENTE: 'Embora [N] aponte X, [M] sugere Y'. Cada afirmação deve ter citação numérica [N]. Texto 100% em PT-BR fluído e científico. Priorize periódicos peer-reviewed.",
+  "article_summaries": {
+    "CHAVE_DO_ARTIGO_1": {
+      "resumo_tecnico": "Resumo técnico para pesquisadores: tipo de estudo, N amostral, metodologia principal, resultados estatísticos (p-valor, HR, OR, IC95% se disponível), conclusão principal. Use terminologia acadêmica precisa. 2-4 frases.",
+      "resumo_popular": "Resumo para leigos: explique o que o estudo investigou e o que descobriu em linguagem simples. Use analogias se necessário. Responda 'por que isso importa no dia a dia?'. 2-3 frases.",
+      "evidence_level_badge": "Uma das opções: Meta-análise | Revisão Sistemática | Ensaio Clínico Randomizado | Estudo de Coorte | Estudo Transversal | Estudo Caso-Controle | Relato de Caso | Preprint não revisado | Revisão Narrativa | Estudo Observacional"
+    }
+  },
   "cited_sources": [
     {
       "index": 1,
-      "title": "título exato do artigo [1] da lista",
-      "doi": "doi do artigo ou n/a",
-      "citations": número_de_citações,
-      "venue_type": "journal" | "conference" | "preprint" | "other",
-      "evidence_level": "frase curta: ex. Meta-análise peer-reviewed · Lancet 2023",
+      "title": "título exato do artigo [1]",
+      "doi": "doi ou n/a",
+      "citations": 0,
+      "venue_type": "journal",
+      "evidence_level": "frase curta: ex. Meta-análise Cochrane · Lancet 2023",
       "year": "ano",
-      "authors": "sobrenome do 1º autor et al."
+      "authors": "Sobrenome et al."
     }
   ],
-  "consensus_agree": number,
-  "consensus_inconclusive": number,
-  "consensus_contradict": number,
-  "confidence_level": "alta" | "média" | "baixa",
-  "confidence_score": number (40-95),
-  "confidence_reasons": ["razão 1 sobre qualidade metodológica", "razão 2", "razão 3"],
-  "inconclusive_summary": "O que ainda está em debate ou sem conclusão",
-  "contradict_explanation": "O que os estudos contrários argumentam (vazio se consensus_contradict=0)",
-  "practical_insight": "Aplicação prática para pesquisa acadêmica",
-  "search_tip": "Sugestão de termos mais específicos para refinar a busca",
-  "maturity_label": "Consenso consolidado" | "Debate ativo" | "Evidência emergente" | "Campo controverso",
+  "consensus_agree": 0,
+  "consensus_inconclusive": 100,
+  "consensus_contradict": 0,
+  "confidence_level": "alta",
+  "confidence_score": 75,
+  "confidence_reasons": [
+    "razão 1 sobre QUALIDADE METODOLÓGICA (design, peer-review, impacto)",
+    "razão 2",
+    "razão 3"
+  ],
+  "inconclusive_summary": "O que ainda está em debate ou sem conclusão definitiva",
+  "contradict_explanation": "O que os estudos contrários argumentam (string vazia se consensus_contradict=0)",
+  "practical_insight": "Aplicação prática para pesquisa acadêmica — o que um pesquisador deve considerar",
+  "search_tip": "Sugestão de termos MeSH ou operadores booleanos para refinar a busca",
+  "maturity_label": "Consenso consolidado",
   "study_recortes": [
-    "Estudo [autor, ano]: [achado específico — 1 frase com n, p-valor ou efeito]"
+    "Estudo [autor, ano]: [achado específico com n, p-valor ou efeito]"
   ],
   "resumos_pt": {
-    "doi-do-artigo-1": "Resumo em 1-2 frases em português do que o estudo investigou e encontrou.",
-    "n/a-indice-N": "Resumo em português baseado no título quando não há DOI."
+    "CHAVE_DO_ARTIGO_1": "Resumo em 1-2 frases em português (mantido por compatibilidade)."
   }
 }
 
-IMPORTANTE:
-- inline_synthesis: obrigatório. Use [N] após cada afirmação para citar o artigo. Texto 100% em português, fluído e científico.
-- cited_sources: inclua apenas os artigos efetivamente citados em inline_synthesis (máx 8). venue_type classifique: "preprint" para arXiv/bioRxiv/medRxiv, "conference" se venue contém "conference"/"proceedings", "journal" para os demais peer-reviewed, "other" para os sem venue claro.
-- study_recortes: 3-4 itens com achados concretos (n amostral, efeito, p-valor se disponível).
-- resumos_pt: para TODOS os artigos da lista. Use doi como chave; se doi="n/a", use "n/a-{índice}" (ex: "n/a-3").`;
+INSTRUÇÕES CRÍTICAS:
+- inline_synthesis: OBRIGATÓRIO. Mínimo 5 frases. Cite [N] após cada afirmação. Aponte divergências quando existirem.
+- article_summaries: para TODOS os artigos listados. Use a "chave" exata de cada artigo (doi ou "n/a-N"). resumo_tecnico em linguagem acadêmica precisa. resumo_popular acessível, sem jargão.
+- cited_sources: apenas artigos citados em inline_synthesis (máx 8).
+- confidence_reasons: fale sobre QUALIDADE da evidência (design, revisão por pares, tamanho amostral). NUNCA copie achados factuais dos estudos.
+- study_recortes: 3-5 recortes concretos com dados numéricos dos abstracts.
+- resumos_pt: compatibilidade — use mesma chave de article_summaries.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -137,8 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: buildUserPrompt(query, articles) },
         ],
-        temperature: 0.3,
-        max_tokens: 2800,
+        temperature: 0.25,
+        max_tokens: 4000,
       }),
     });
 

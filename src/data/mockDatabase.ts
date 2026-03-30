@@ -58,6 +58,15 @@ export interface CitedSource {
   authors?: string;
 }
 
+export interface ArticleSummary {
+  /** Focado em metodologia, N amostral, resultados estatísticos, conclusão principal */
+  resumo_tecnico: string;
+  /** Linguagem simples, analogias, impacto no dia a dia */
+  resumo_popular: string;
+  /** Ex: "Revisão Sistemática" | "Ensaio Clínico" | "Coorte" | "Preprint" */
+  evidence_level_badge: string;
+}
+
 export interface Synthesis {
   direct_answer: string;
   inline_synthesis?: string;
@@ -75,6 +84,8 @@ export interface Synthesis {
   study_recortes?: string[];
   maturity_label?: string;
   resumos_pt?: Record<string, string>;
+  /** Resumo técnico + popular + badge por artigo (chave = doi ou "n/a-{índice}") */
+  article_summaries?: Record<string, ArticleSummary>;
 }
 
 export interface MockEntry {
