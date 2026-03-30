@@ -866,6 +866,8 @@ const ResultsView = ({
 
   const icmScore = (result.synthesis.confidence_score / 10).toFixed(1);
   const icmLabel = Number(icmScore) >= 8 ? "Muito forte" : Number(icmScore) >= 6 ? "Forte" : Number(icmScore) >= 4 ? "Moderado" : "Limitado";
+  const hasConsensusData = result.synthesis.consensus_agree > 0 || result.synthesis.consensus_contradict > 0;
+  const showConsensus = queryIntention.mode === "consensus" && hasConsensusData;
   const maturityLabel = result.synthesis.maturity_label || (
     Number(icmScore) >= 8 ? "Consenso consolidado" : Number(icmScore) >= 6 ? "Evidência forte" : Number(icmScore) >= 4 ? "Debate ativo" : "Evidência emergente"
   );
@@ -1143,12 +1145,12 @@ const ResultsView = ({
 
               {/* Stats row */}
               <p className="text-[10px] text-white/40 mb-2">
-                {queryIntention.mode === "consensus"
+                {showConsensus
                   ? <>De {result.count} estudos encontrados — distribuição dos resultados: <span className="ml-1 text-white/30" title="Concordam = chegam à mesma conclusão · Inconclusivo = sem resultado claro · Contradizem = conclusão oposta">ⓘ</span></>
                   : `${result.count} estudos analisados — síntese temática`}
               </p>
-              <div className={`grid gap-3 mb-5 ${queryIntention.mode === "consensus" ? "grid-cols-3" : "grid-cols-2"}`}>
-                {queryIntention.mode === "consensus" && (
+              <div className={`grid gap-3 mb-5 ${showConsensus ? "grid-cols-3" : "grid-cols-2"}`}>
+                {showConsensus && (
                   <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
                     <span className={`text-2xl font-black ${
                       result.synthesis.consensus_agree >= 70 ? "text-emerald-400" :
@@ -1183,7 +1185,7 @@ const ResultsView = ({
               {/* Inner tabs */}
               <div className="flex gap-1 bg-white/5 rounded-xl p-1 mb-4">
                 {[
-                  ...(queryIntention.mode === "consensus" ? [{ id: "distribuicao" as const, label: "Distribuição" }] : []),
+                  ...(showConsensus ? [{ id: "distribuicao" as const, label: "Distribuição" }] : []),
                   { id: "detalhes" as const, label: "Análise" },
                   { id: "insights" as const, label: "Insights" },
                 ].map((tab) => (
@@ -1191,7 +1193,7 @@ const ResultsView = ({
                     key={tab.id}
                     onClick={() => setConsensusTab(tab.id)}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      (consensusTab === tab.id || (consensusTab === "distribuicao" && queryIntention.mode === "summary" && tab.id === "detalhes"))
+                      (consensusTab === tab.id || (consensusTab === "distribuicao" && !showConsensus && tab.id === "detalhes"))
                         ? "bg-white/15 text-white"
                         : "text-white/40 hover:text-white/70"
                     }`}
@@ -1202,7 +1204,7 @@ const ResultsView = ({
               </div>
 
               {/* Tab: Distribuição */}
-              {consensusTab === "distribuicao" && queryIntention.mode === "consensus" && (
+              {consensusTab === "distribuicao" && showConsensus && (
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-3">
                     <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
@@ -1240,7 +1242,7 @@ const ResultsView = ({
               )}
 
               {/* Tab: Análise */}
-              {(consensusTab === "detalhes" || (consensusTab === "distribuicao" && queryIntention.mode === "summary")) && (
+              {(consensusTab === "detalhes" || (consensusTab === "distribuicao" && !showConsensus)) && (
                 <div className="space-y-4">
                   {result.synthesis.inconclusive_summary && (
                     <div>

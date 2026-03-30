@@ -301,32 +301,6 @@ const Sources = () => {
           })}
         </div>
 
-        {/* API Integration Note */}
-        <div className="mt-12 bg-primary/5 border border-primary/15 rounded-2xl p-6">
-          <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
-            <Cpu size={16} className="text-primary" /> Integração de APIs — Viabilidade Técnica
-          </h3>
-          <div className="grid md:grid-cols-3 gap-4 mt-4">
-            {[
-              {
-                name: "OpenAlex", status: "✅ Recomendado", desc: "API REST gratuita, sem autenticação, 250M+ artigos, suporte a paginação e filtros avançados. Melhor opção para escala.", color: "emerald"
-              },
-              {
-                name: "Semantic Scholar", status: "✅ Recomendado", desc: "API gratuita com chave, limite generoso (100 req/s), TLDRs e análise semântica nativa. Ideal para sumarização.", color: "emerald"
-              },
-              {
-                name: "Google Scholar", status: "⚠️ Restrito", desc: "Não possui API oficial. Scraping viola os termos de serviço. Use OpenAlex ou Semantic Scholar como alternativa superior.", color: "amber"
-              },
-            ].map(({ name, status, desc, color }) => (
-              <div key={name} className="bg-foreground/[0.03] rounded-xl p-4 border border-foreground/5">
-                <p className="font-semibold text-foreground text-sm mb-0.5">{name}</p>
-                <p className={`text-[10px] font-bold mb-2 ${color === "emerald" ? "text-emerald-400" : "text-amber-400"}`}>{status}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Footer note */}
         <div className="mt-8 text-center">
           <p className="text-xs text-muted-foreground leading-relaxed">
