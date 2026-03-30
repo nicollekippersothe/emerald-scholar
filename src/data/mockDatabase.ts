@@ -47,8 +47,21 @@ export interface Article {
   isMock?: boolean;
 }
 
+export interface CitedSource {
+  index: number;
+  title: string;
+  doi: string;
+  citations: number;
+  venue_type: "journal" | "conference" | "preprint" | "other";
+  evidence_level: string;
+  year?: string;
+  authors?: string;
+}
+
 export interface Synthesis {
   direct_answer: string;
+  inline_synthesis?: string;
+  cited_sources?: CitedSource[];
   consensus_agree: number;
   consensus_inconclusive: number;
   consensus_contradict: number;

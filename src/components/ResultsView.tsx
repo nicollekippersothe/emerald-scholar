@@ -33,6 +33,7 @@ import FeedbackModal from "@/components/FeedbackModal";
 import DevModal from "@/components/DevModal";
 import PromoCodeModal from "@/components/PromoCodeModal";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
+import SynthesisPanel from "@/components/SynthesisPanel";
 import { useQueryIntention } from "@/hooks/useQueryIntention";
 import { type MockEntry, type Article, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
 
@@ -803,7 +804,6 @@ const ResultsView = ({
   const [expertFilter, setExpertFilter] = useState(false);
   const [oaFilter, setOaFilter] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
-  const [consensusTab, setConsensusTab] = useState<"distribuicao" | "detalhes" | "insights">("distribuicao");
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [displayCount, setDisplayCount] = useState(5);
   const [pdfUnlocked, setPdfUnlocked] = useState(false);
@@ -884,16 +884,6 @@ const ResultsView = ({
       return 0; // relevancia = original order
     });
 
-  const icmScore = (result.synthesis.confidence_score / 10).toFixed(1);
-  const icmLabel = Number(icmScore) >= 8 ? "Muito forte" : Number(icmScore) >= 6 ? "Forte" : Number(icmScore) >= 4 ? "Moderado" : "Limitado";
-  const hasConsensusData = result.synthesis.consensus_agree > 0 || result.synthesis.consensus_contradict > 0;
-  const showConsensus = queryIntention.mode === "consensus" && hasConsensusData;
-  const maturityLabel = result.synthesis.maturity_label || (
-    Number(icmScore) >= 8 ? "Consenso consolidado" : Number(icmScore) >= 6 ? "Evidência forte" : Number(icmScore) >= 4 ? "Debate ativo" : "Evidência emergente"
-  );
-
-  // Unique sources in results
-  const resultSources = [...new Set(result.articles.map(a => a.source))];
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
@@ -1122,204 +1112,14 @@ const ResultsView = ({
             </div>
 
             {/* UNIFIED SYNTHESIS PANEL */}
-            <div className="bg-gradient-to-br from-[hsl(160,82%,11%)] to-[hsl(160,60%,16%)] rounded-3xl p-6 md:p-8 border border-foreground/5 shadow-2xl mb-6">
-              {/* Header */}
-              <div className="mb-1 flex items-center gap-3 flex-wrap">
-                <span className="text-primary/80 text-[10px] font-bold uppercase tracking-widest">
-                  {result.count} ESTUDOS ANALISADOS
-                </span>
-                {synthesisLoading && (
-                  <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse">
-                    Gerando síntese com IA...
-                  </span>
-                )}
-                {result.synthesis.maturity_label && (
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                    result.synthesis.maturity_label.includes("Consenso")
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : result.synthesis.maturity_label.includes("Debate")
-                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                        : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                  }`}>
-                    {result.synthesis.maturity_label}
-                  </span>
-                )}
-              </div>
-              <h3 className="text-xl font-bold text-white mb-4">"{query}"</h3>
-
-              {/* Source badges */}
-              <div className="flex gap-1.5 mb-5 flex-wrap">
-                {resultSources.map((name) => {
-                  const badge = SC_BADGES.find((b) => b.name === name);
-                  return (
-                    <span
-                      key={name}
-                      style={{ backgroundColor: `${badge?.color}20`, color: badge?.color, borderColor: `${badge?.color}30` }}
-                      className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold border"
-                    >
-                      {name}
-                    </span>
-                  );
-                })}
-              </div>
-
-              {/* Stats row */}
-              <p className="text-[10px] text-white/40 mb-2">
-                {showConsensus
-                  ? <>De {result.count} estudos encontrados — distribuição dos resultados: <span className="ml-1 text-white/30" title="Concordam = chegam à mesma conclusão · Inconclusivo = sem resultado claro · Contradizem = conclusão oposta">ⓘ</span></>
-                  : `${result.count} estudos analisados — síntese temática`}
-              </p>
-              <div className={`grid gap-3 mb-5 ${showConsensus ? "grid-cols-3" : "grid-cols-2"}`}>
-                {showConsensus && (
-                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
-                    <span className={`text-2xl font-black ${
-                      result.synthesis.consensus_agree >= 70 ? "text-emerald-400" :
-                      result.synthesis.consensus_agree >= 50 ? "text-amber-400" : "text-rose-400"
-                    }`}>{result.synthesis.consensus_agree}%</span>
-                    <p className="text-[10px] text-white/50 mt-0.5">Concordam</p>
-                  </div>
-                )}
-                <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
-                  <span className="text-2xl font-black text-white">{icmScore}</span>
-                  <p className="text-[10px] text-white/50 mt-0.5">ICM /10</p>
-                </div>
-                <div className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
-                  <span className="text-sm font-black text-white capitalize leading-tight block mt-1">{result.synthesis.confidence_level}</span>
-                  <p className="text-[10px] text-white/50 mt-0.5">Confiança</p>
-                </div>
-              </div>
-
-              {/* Direct answer */}
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 mb-5">
-                {synthesisLoading ? (
-                  <div className="space-y-2 animate-pulse">
-                    <div className="h-3 bg-white/10 rounded-full w-full" />
-                    <div className="h-3 bg-white/10 rounded-full w-5/6" />
-                    <div className="h-3 bg-white/10 rounded-full w-4/6" />
-                  </div>
-                ) : (
-                  <p className="text-sm text-white/90 leading-relaxed">{result.synthesis.direct_answer}</p>
-                )}
-              </div>
-
-              {/* Inner tabs */}
-              <div className="flex gap-1 bg-white/5 rounded-xl p-1 mb-4">
-                {[
-                  ...(showConsensus ? [{ id: "distribuicao" as const, label: "Distribuição" }] : []),
-                  { id: "detalhes" as const, label: "Análise" },
-                  { id: "insights" as const, label: "Insights" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setConsensusTab(tab.id)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      (consensusTab === tab.id || (consensusTab === "distribuicao" && !showConsensus && tab.id === "detalhes"))
-                        ? "bg-white/15 text-white"
-                        : "text-white/40 hover:text-white/70"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab: Distribuição */}
-              {consensusTab === "distribuicao" && showConsensus && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
-                      <CheckCircle2 size={11} className="text-emerald-400" /> Concordam
-                    </span>
-                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${result.synthesis.consensus_agree}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-400 w-10 text-right">{result.synthesis.consensus_agree}%</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
-                      <AlertTriangle size={11} className="text-amber-400" /> Inconclusivo
-                    </span>
-                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-400" style={{ width: `${result.synthesis.consensus_inconclusive}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-amber-400 w-10 text-right">{result.synthesis.consensus_inconclusive}%</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold text-white/70 w-28 flex items-center gap-1.5 shrink-0">
-                      <XCircle size={11} className="text-rose-400" /> Contradizem
-                    </span>
-                    <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                      <div className="h-full rounded-full bg-rose-400" style={{ width: `${result.synthesis.consensus_contradict}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-rose-400 w-10 text-right">{result.synthesis.consensus_contradict}%</span>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-white/10 flex items-baseline gap-2">
-                    <span className="text-xl font-black text-white">{icmScore}</span>
-                    <span className="text-xs text-white/50">/10 · ICM</span>
-                    <span className="text-xs text-white/40 ml-1">— {icmLabel}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: Análise */}
-              {(consensusTab === "detalhes" || (consensusTab === "distribuicao" && !showConsensus)) && (
-                <div className="space-y-4">
-                  {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 block">🔬 O que os estudos encontraram</span>
-                      <div className="space-y-2">
-                        {result.synthesis.study_recortes.map((r, i) => (
-                          <div key={i} className="flex gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
-                            <span className="text-white/30 text-xs shrink-0 mt-0.5">{i + 1}.</span>
-                            <p className="text-xs text-white/75 leading-relaxed">{r}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {result.synthesis.inconclusive_summary && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">⚠️ Pontos em debate</span>
-                      <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.inconclusive_summary}</p>
-                    </div>
-                  )}
-                  {result.synthesis.contradict_explanation && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">❌ Estudos que contradizem</span>
-                      <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.contradict_explanation}</p>
-                    </div>
-                  )}
-                  {result.synthesis.confidence_reasons && result.synthesis.confidence_reasons.length > 0 && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">📊 Qualidade da evidência</span>
-                      {result.synthesis.confidence_reasons.map((r, i) => (
-                        <p key={i} className="text-xs text-white/60 mt-1">· {r}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tab: Insights */}
-              {consensusTab === "insights" && (
-                <div className="space-y-4">
-                  {result.synthesis.practical_insight && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">💡 Aplicação prática</span>
-                      <p className="text-sm text-white/80 leading-relaxed">{result.synthesis.practical_insight}</p>
-                    </div>
-                  )}
-                  {result.synthesis.search_tip && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">
-                        <Zap size={10} className="inline mr-1" />Dica de busca
-                      </span>
-                      <p className="text-xs text-white/60">{result.synthesis.search_tip}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <SynthesisPanel
+              query={query}
+              count={result.count}
+              synthesis={result.synthesis}
+              queryType={queryIntention.mode === "consensus" ? "hypothesis" : "broad"}
+              articles={result.articles}
+              synthesisLoading={synthesisLoading}
+            />
 
             {/* AI WARNING */}
             <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 mb-6">
