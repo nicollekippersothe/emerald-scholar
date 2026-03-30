@@ -7,7 +7,14 @@ export const config = { maxDuration: 60 };
 // Prioridade: GOOGLE_AI_KEY (gratuito, 1500 req/dia) → OPENROUTER_API_KEY
 const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.0-flash-lite-001";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-3-12b-it:free";
+
+// Fallback chain de modelos :free caso o principal esteja rate-limited
+const FREE_MODEL_FALLBACKS = [
+  "google/gemma-3-12b-it:free",
+  "google/gemma-3n-e4b-it:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+];
 
 // Google AI Studio endpoint (Gemini 1.5 Flash — gratuito)
 const GOOGLE_AI_URL = (model: string, key: string) =>
@@ -135,34 +142,56 @@ async function callGoogleAI(prompt: string): Promise<string> {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 }
 
-// ─── Chamar OpenRouter ────────────────────────────────────────────────────────
+// ─── Chamar OpenRouter (com fallback chain para modelos :free) ────────────────
 async function callOpenRouter(prompt: string): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://scholaria.vercel.app",
-      "X-Title": "ScholarIA",
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.25,
-      max_tokens: 4000,
-    }),
-  });
+  // Se modelo configurado não é :free, tenta direto
+  const isCustomModel = OPENROUTER_MODEL !== FREE_MODEL_FALLBACKS[0];
+  const modelsToTry = isCustomModel
+    ? [OPENROUTER_MODEL]
+    : FREE_MODEL_FALLBACKS;
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${err}`);
+  let lastError = "";
+  for (const model of modelsToTry) {
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://scholaria.vercel.app",
+        "X-Title": "ScholarIA",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.25,
+        max_tokens: 4000,
+      }),
+    });
+
+    if (res.status === 429) {
+      // Rate limited — tenta próximo modelo
+      console.warn(`[api/summarize] ${model} rate-limited, tentando próximo...`);
+      lastError = `429 rate-limited`;
+      continue;
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenRouter ${res.status} (${model}): ${err}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      console.log(`[api/summarize] sucesso com modelo: ${model}`);
+      return content;
+    }
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "{}";
+  throw new Error(`Todos os modelos OpenRouter falharam (${lastError}). Configure GOOGLE_AI_KEY para síntese confiável.`);
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
