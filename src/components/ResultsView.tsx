@@ -228,9 +228,46 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
 
       {/* Abstract */}
       <div className="mb-3">
-        <div className="bg-background/60 p-4 rounded-xl text-sm text-foreground/80 italic border border-foreground/5 leading-relaxed">
-          "{article.abstract_pt}"
-        </div>
+        {article.abstract_pt ? (
+          <div className="relative group">
+            <div className="bg-background/60 p-4 rounded-xl text-sm text-foreground/80 italic border border-foreground/5 leading-relaxed">
+              "{article.abstract_pt}"
+            </div>
+            <a
+              href={`https://translate.google.com/?sl=pt&tl=en&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+              title="Traduzir resumo para inglês via Google Translate"
+            >
+              <span>🌐</span> Traduzir para inglês
+            </a>
+          </div>
+        ) : (
+          <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl text-sm text-foreground/70 leading-relaxed">
+            <p className="text-[10px] font-semibold text-amber-400 mb-2 uppercase tracking-wide">Resumo não disponível — descrição gerada a partir dos metadados</p>
+            <p>
+              {[
+                article.study_type ? `${STUDY_TYPE_MAP[article.study_type]?.label || article.study_type} publicado em` : "Artigo publicado em",
+                `${article.journal} (${article.year}).`,
+                article.evidence_reason || "",
+                article.potential_bias && article.potential_bias !== "Nenhum identificado"
+                  ? `Limitação: ${article.potential_bias}`
+                  : "",
+              ].filter(Boolean).join(" ")}
+            </p>
+            {(article.url || article.doi) && (
+              <a
+                href={article.url || `https://doi.org/${article.doi}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              >
+                <ExternalLink size={10} /> Ver resumo original no periódico
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bias warning */}
