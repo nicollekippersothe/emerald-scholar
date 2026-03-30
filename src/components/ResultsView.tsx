@@ -203,8 +203,8 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
           <ExternalLink size={12} />
         </a>
       </div>
-      <p className="text-xs text-muted-foreground mb-3">
-        {article.authors} · {article.citations > 0 ? `${article.citations.toLocaleString()} citações` : ""}
+      <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
+        {article.authors}{article.citations > 0 ? ` · ${article.citations.toLocaleString()} citações` : ""}
       </p>
 
       {/* Score */}
@@ -239,44 +239,65 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
       </div>
 
       {/* Abstract */}
-      <div className="mb-3">
-        {article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? (
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide mb-1.5">Resumo</p>
-            <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
-              <p className={`text-sm text-foreground/80 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
-                {article.abstract_pt}
-              </p>
-              {article.abstract_pt.length > 200 && (
-                <button
-                  onClick={() => setExpandedAbstract(v => !v)}
-                  className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-                >
-                  {expandedAbstract ? "▲ Recolher" : "▼ Ver completo"}
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="border border-foreground/8 bg-foreground/[0.02] p-3 rounded-xl text-sm text-foreground/60 leading-relaxed">
-            <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">Resumo não disponível</p>
-            <p className="text-xs">
-              {studyInfo.icon} {studyInfo.label} · {article.journal} ({article.year})
-              {article.evidence_reason ? ` · ${article.evidence_reason}` : ""}
-            </p>
-            {(article.url || article.doi) && (
-              <a
-                href={article.url || `https://doi.org/${article.doi}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-              >
-                <ExternalLink size={10} /> Ver no periódico
-              </a>
+      {(() => {
+        const hasAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível.";
+        const isEnglish = !article.isMock && hasAbstract;
+        const abstractLabel = isEnglish ? "Abstract (inglês)" : "Resumo";
+        return (
+          <div className="mb-3">
+            {hasAbstract ? (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide">{abstractLabel}</p>
+                  {isEnglish && (
+                    <a
+                      href={`https://translate.google.com/?sl=en&tl=pt-BR&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1"
+                    >
+                      🌐 Traduzir
+                    </a>
+                  )}
+                </div>
+                <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
+                  <p className={`text-sm text-foreground/75 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
+                    {article.abstract_pt}
+                  </p>
+                  {article.abstract_pt.length > 220 && (
+                    <button
+                      onClick={() => setExpandedAbstract(v => !v)}
+                      className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {expandedAbstract ? "▲ Recolher" : "▼ Ver completo"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="border border-foreground/8 bg-foreground/[0.02] px-4 py-3 rounded-xl">
+                <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wide mb-2">Resumo não disponível</p>
+                <p className="text-xs text-foreground/50 leading-relaxed">
+                  {studyInfo.icon} {studyInfo.label}
+                  {article.journal && article.journal !== "Periódico não informado" ? ` · ${article.journal}` : ""}
+                  {article.year ? ` (${article.year})` : ""}
+                  {article.citations > 0 ? ` · ${article.citations.toLocaleString()} citações` : ""}
+                </p>
+                {(article.url || article.doi) && (
+                  <a
+                    href={article.url || `https://doi.org/${article.doi}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                  >
+                    <ExternalLink size={10} /> Ver resumo no periódico
+                  </a>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Bias warning */}
       {article.potential_bias && article.potential_bias !== "Nenhum identificado" && (

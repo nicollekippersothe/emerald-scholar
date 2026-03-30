@@ -104,6 +104,13 @@ function reconstructAbstract(
   return words.filter(Boolean).join(" ");
 }
 
+function truncateAuthors(authors: string): string {
+  if (!authors) return "Autores não disponíveis";
+  const parts = authors.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 3) return parts.join(", ");
+  return parts.slice(0, 3).join(", ") + " et al.";
+}
+
 function oaSource(work: {
   primary_location?: {
     source?: {
@@ -269,7 +276,7 @@ async function fetchEuropePMC(query: string): Promise<Article[]> {
       const studyType = studyTypeFromLabel(r.pubType ?? "");
       return buildArticle({
         title: r.title,
-        authors: r.authorString ?? "Autores não disponíveis",
+        authors: truncateAuthors(r.authorString ?? ""),
         year: r.pubYear ? parseInt(r.pubYear) : null,
         journal: r.journalTitle ?? "Periódico não informado",
         source: epmcSource(r.source ?? ""),
