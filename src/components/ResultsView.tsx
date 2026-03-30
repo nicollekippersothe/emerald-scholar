@@ -191,7 +191,18 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
       </div>
 
       {/* Title */}
-      <h4 className="font-bold text-foreground leading-tight mb-1 line-clamp-2">{article.title}</h4>
+      <div className="flex items-start gap-2 mb-1">
+        <h4 className="font-bold text-foreground leading-tight line-clamp-2 flex-1">{article.title}</h4>
+        <a
+          href={`https://translate.google.com/?sl=auto&tl=pt-BR&text=${encodeURIComponent(article.title)}&op=translate`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 mt-0.5 text-muted-foreground/50 hover:text-primary transition-colors"
+          title="Ver título em português"
+        >
+          <ExternalLink size={12} />
+        </a>
+      </div>
       <p className="text-xs text-muted-foreground mb-3">
         {article.authors} · {article.citations > 0 ? `${article.citations.toLocaleString()} citações` : ""}
       </p>
@@ -229,42 +240,29 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
 
       {/* Abstract */}
       <div className="mb-3">
-        {article.abstract_pt ? (
+        {article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? (
           <div>
-            <div className="bg-background/60 px-4 pt-4 pb-3 rounded-xl border border-foreground/5">
-              <p className={`text-sm text-foreground/80 italic leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
-                "{article.abstract_pt}"
+            <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide mb-1.5">Resumo</p>
+            <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
+              <p className={`text-sm text-foreground/80 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
+                {article.abstract_pt}
               </p>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-foreground/5">
+              {article.abstract_pt.length > 200 && (
                 <button
                   onClick={() => setExpandedAbstract(v => !v)}
-                  className="text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                  className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {expandedAbstract ? "▲ Recolher" : "▼ Ver resumo completo"}
+                  {expandedAbstract ? "▲ Recolher" : "▼ Ver completo"}
                 </button>
-                <a
-                  href={`https://translate.google.com/?sl=pt&tl=en&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-                >
-                  🌐 Traduzir
-                </a>
-              </div>
+              )}
             </div>
           </div>
         ) : (
-          <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl text-sm text-foreground/70 leading-relaxed">
-            <p className="text-[10px] font-semibold text-amber-400 mb-2 uppercase tracking-wide">Resumo não disponível — descrição gerada a partir dos metadados</p>
-            <p>
-              {[
-                article.study_type ? `${STUDY_TYPE_MAP[article.study_type]?.label || article.study_type} publicado em` : "Artigo publicado em",
-                `${article.journal} (${article.year}).`,
-                article.evidence_reason || "",
-                article.potential_bias && article.potential_bias !== "Nenhum identificado"
-                  ? `Limitação: ${article.potential_bias}`
-                  : "",
-              ].filter(Boolean).join(" ")}
+          <div className="border border-foreground/8 bg-foreground/[0.02] p-3 rounded-xl text-sm text-foreground/60 leading-relaxed">
+            <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">Resumo não disponível</p>
+            <p className="text-xs">
+              {studyInfo.icon} {studyInfo.label} · {article.journal} ({article.year})
+              {article.evidence_reason ? ` · ${article.evidence_reason}` : ""}
             </p>
             {(article.url || article.doi) && (
               <a
@@ -273,7 +271,7 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
               >
-                <ExternalLink size={10} /> Ver resumo original no periódico
+                <ExternalLink size={10} /> Ver no periódico
               </a>
             )}
           </div>
@@ -1254,23 +1252,36 @@ const ResultsView = ({
               {/* Tab: Análise */}
               {(consensusTab === "detalhes" || (consensusTab === "distribuicao" && !showConsensus)) && (
                 <div className="space-y-4">
+                  {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2 block">🔬 O que os estudos encontraram</span>
+                      <div className="space-y-2">
+                        {result.synthesis.study_recortes.map((r, i) => (
+                          <div key={i} className="flex gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
+                            <span className="text-white/30 text-xs shrink-0 mt-0.5">{i + 1}.</span>
+                            <p className="text-xs text-white/75 leading-relaxed">{r}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {result.synthesis.inconclusive_summary && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Pontos inconclusivos</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">⚠️ Pontos em debate</span>
                       <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.inconclusive_summary}</p>
                     </div>
                   )}
                   {result.synthesis.contradict_explanation && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Estudos que contradizem</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">❌ Estudos que contradizem</span>
                       <p className="text-sm text-white/70 leading-relaxed">{result.synthesis.contradict_explanation}</p>
                     </div>
                   )}
                   {result.synthesis.confidence_reasons && result.synthesis.confidence_reasons.length > 0 && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">Razões da confiança</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">📊 Qualidade da evidência</span>
                       {result.synthesis.confidence_reasons.map((r, i) => (
-                        <p key={i} className="text-sm text-white/70">· {r}</p>
+                        <p key={i} className="text-xs text-white/60 mt-1">· {r}</p>
                       ))}
                     </div>
                   )}
@@ -1292,18 +1303,6 @@ const ResultsView = ({
                         <Zap size={10} className="inline mr-1" />Dica de busca
                       </span>
                       <p className="text-xs text-white/60">{result.synthesis.search_tip}</p>
-                    </div>
-                  )}
-                  {result.synthesis.study_recortes && result.synthesis.study_recortes.length > 0 && (
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5 block">🔍 Recortes dos estudos</span>
-                      <div className="space-y-2">
-                        {result.synthesis.study_recortes.map((r, i) => (
-                          <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/10 text-xs text-white/70 leading-relaxed">
-                            {r}
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>

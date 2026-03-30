@@ -145,6 +145,32 @@ const SOURCES = [
     limitations: ["Inclui preprints sem revisão por pares", "Qualidade dos metadados depende dos repositórios de origem"],
     url: "https://core.ac.uk",
   },
+  {
+    name: "Cochrane Library",
+    color: "#0EA5E9",
+    icon: Microscope,
+    type: "Revisões sistemáticas de padrão ouro",
+    agency: "Cochrane Collaboration · Internacional",
+    coverage: "Mais de 8.000 revisões sistemáticas Cochrane em saúde e medicina clínica, consideradas o mais alto nível de evidência disponível.",
+    peerReview: true,
+    openAccess: "Parcial (resumos gratuitos; texto completo por assinatura ou via SUS/CAPES)",
+    strengths: ["Padrão ouro em medicina baseada em evidências", "Revisões sistemáticas com meta-análises rigorosas", "Protocolo GRADE para graduação de evidências", "Altamente citadas por diretrizes clínicas mundiais"],
+    limitations: ["Foco exclusivo em saúde e medicina clínica", "Atualização pode ser lenta em áreas de rápida evolução", "Texto completo requer acesso institucional"],
+    url: "https://www.cochranelibrary.com",
+  },
+  {
+    name: "BVS / LILACS",
+    color: "#10B981",
+    icon: Building2,
+    type: "Biblioteca Virtual em Saúde da América Latina",
+    agency: "BIREME/OPAS/OMS · Brasil e América Latina",
+    coverage: "Mais de 900.000 artigos em saúde da América Latina e Caribe, incluindo literatura técnica, dissertações e relatórios em português e espanhol.",
+    peerReview: true,
+    openAccess: "Sim (texto completo gratuito para a maioria)",
+    strengths: ["Maior e mais abrangente base de literatura científica e técnica da AL", "Cobertura em português e espanhol com texto completo", "Inclui teses, dissertações e relatórios técnicos regionais", "Essencial para pesquisa em saúde pública brasileira"],
+    limitations: ["Foco regional em saúde — não cobre outras áreas do conhecimento", "Metadados podem estar incompletos em publicações mais antigas"],
+    url: "https://bvsalud.org",
+  },
 ];
 
 const Sources = () => {
@@ -175,13 +201,13 @@ const Sources = () => {
         {/* Hero */}
         <div className="mb-12 text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold mb-6 border border-primary/20">
-            <Database size={14} /> 11 BASES SIMULTÂNEAS
+            <Database size={14} /> 13 BASES SIMULTÂNEAS
           </div>
           <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-4">
             Nossas Fontes Científicas
           </h2>
           <p className="text-foreground/60 max-w-2xl mx-auto leading-relaxed">
-            Cada busca no Emerald Scholar consulta simultaneamente 11 bases de dados acadêmicas selecionadas pelo rigor
+            Cada busca no ScholarIA consulta simultaneamente 13 bases de dados acadêmicas selecionadas pelo rigor
             científico, cobertura geográfica e diversidade de acesso. Entenda o que cada fonte oferece, suas forças e limitações.
           </p>
         </div>

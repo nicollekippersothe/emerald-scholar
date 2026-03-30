@@ -59,8 +59,15 @@ Retorne APENAS este JSON (sem markdown):
   "contradict_explanation": "O que os estudos contrários argumentam (vazio se consensus_contradict=0)",
   "practical_insight": "Aplicação prática para pesquisa acadêmica",
   "search_tip": "Sugestão de termos mais específicos para refinar a busca",
-  "maturity_label": "Consenso consolidado" | "Debate ativo" | "Evidência emergente" | "Campo controverso"
-}`;
+  "maturity_label": "Consenso consolidado" | "Debate ativo" | "Evidência emergente" | "Campo controverso",
+  "study_recortes": [
+    "Estudo [autor, ano]: [o que este estudo específico encontrou sobre a pergunta — 1 frase]",
+    "Estudo [autor, ano]: [achado específico — 1 frase]",
+    "Estudo [autor, ano]: [achado específico — 1 frase]"
+  ]
+}
+
+IMPORTANTE para study_recortes: cite estudos reais da lista acima, mencione achado concreto (n amostral, efeito, p-valor se disponível). Inclua 3-4 itens representando diferentes perspectivas (concordam, inconclusivos, contradizem quando aplicável).`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
