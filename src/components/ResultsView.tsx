@@ -136,6 +136,7 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [expandedAbstract, setExpandedAbstract] = useState(false);
   const [msgs, setMsgs] = useState<{ role: string; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -190,7 +191,7 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
       </div>
 
       {/* Title */}
-      <h4 className="font-bold text-foreground leading-tight mb-1">{article.title}</h4>
+      <h4 className="font-bold text-foreground leading-tight mb-1 line-clamp-2">{article.title}</h4>
       <p className="text-xs text-muted-foreground mb-3">
         {article.authors} · {article.citations > 0 ? `${article.citations.toLocaleString()} citações` : ""}
       </p>
@@ -229,19 +230,28 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
       {/* Abstract */}
       <div className="mb-3">
         {article.abstract_pt ? (
-          <div className="relative group">
-            <div className="bg-background/60 p-4 rounded-xl text-sm text-foreground/80 italic border border-foreground/5 leading-relaxed">
-              "{article.abstract_pt}"
+          <div>
+            <div className="bg-background/60 px-4 pt-4 pb-3 rounded-xl border border-foreground/5">
+              <p className={`text-sm text-foreground/80 italic leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
+                "{article.abstract_pt}"
+              </p>
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-foreground/5">
+                <button
+                  onClick={() => setExpandedAbstract(v => !v)}
+                  className="text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {expandedAbstract ? "▲ Recolher" : "▼ Ver resumo completo"}
+                </button>
+                <a
+                  href={`https://translate.google.com/?sl=pt&tl=en&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                >
+                  🌐 Traduzir
+                </a>
+              </div>
             </div>
-            <a
-              href={`https://translate.google.com/?sl=pt&tl=en&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-              title="Traduzir resumo para inglês via Google Translate"
-            >
-              <span>🌐</span> Traduzir para inglês
-            </a>
           </div>
         ) : (
           <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl text-sm text-foreground/70 leading-relaxed">
