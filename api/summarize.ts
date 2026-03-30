@@ -11,6 +11,7 @@ interface ArticleInput {
   citations: number;
   abstract_pt: string;
   source: string;
+  doi?: string;
 }
 
 const SYSTEM_PROMPT = `Você é um assistente de pesquisa científica especializado em síntese de evidências.
@@ -22,7 +23,7 @@ function buildUserPrompt(query: string, articles: ArticleInput[]): string {
     .slice(0, 12)
     .map(
       (a, i) =>
-        `[${i + 1}] ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} citações, fonte: ${a.source}\nAbstract: ${a.abstract_pt?.slice(0, 400) ?? "N/A"}`
+        `[${i + 1}] doi:${a.doi || "n/a"} | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} citações, fonte: ${a.source}\nAbstract: ${a.abstract_pt?.slice(0, 350) ?? "N/A"}`
     )
     .join("\n\n");
 
@@ -64,10 +65,17 @@ Retorne APENAS este JSON (sem markdown):
     "Estudo [autor, ano]: [o que este estudo específico encontrou sobre a pergunta — 1 frase]",
     "Estudo [autor, ano]: [achado específico — 1 frase]",
     "Estudo [autor, ano]: [achado específico — 1 frase]"
-  ]
+  ],
+  "resumos_pt": {
+    "doi-do-artigo-1": "Resumo em 1-2 frases em português do que o estudo investigou e encontrou.",
+    "doi-do-artigo-2": "Resumo em 1-2 frases em português.",
+    "n/a-indice-N": "Resumo em português baseado no título quando não há DOI."
+  }
 }
 
-IMPORTANTE para study_recortes: cite estudos reais da lista acima, mencione achado concreto (n amostral, efeito, p-valor se disponível). Inclua 3-4 itens representando diferentes perspectivas (concordam, inconclusivos, contradizem quando aplicável).`;
+IMPORTANTE:
+- study_recortes: cite estudos reais da lista, mencione achado concreto (n amostral, efeito, p-valor se disponível). 3-4 itens com perspectivas variadas.
+- resumos_pt: para TODOS os artigos da lista, gere 1-2 frases em português resumindo o estudo. Se o abstract estiver em inglês, traduza e condense. Se for "N/A", baseie-se no título e tipo de estudo. Use o doi como chave; se doi for "n/a", use "n/a-{índice}" (ex: "n/a-3" para o artigo [3]).`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -107,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           { role: "user", content: buildUserPrompt(query, articles) },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     });
 

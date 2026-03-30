@@ -132,7 +132,7 @@ const ScoreDots = ({ score }: { score: number }) => (
 );
 
 /* ── Article Card with Chat ── */
-const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave: () => void; saved: boolean }) => {
+const ArticleCard = memo(({ article, onSave, saved, resumoPt }: { article: Article; onSave: () => void; saved: boolean; resumoPt?: string }) => {
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -240,31 +240,22 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
 
       {/* Abstract */}
       {(() => {
-        const hasAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível.";
-        const isEnglish = !article.isMock && hasAbstract;
-        const abstractLabel = isEnglish ? "Abstract (inglês)" : "Resumo";
+        const aiSummary = resumoPt?.trim();
+        const rawAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
+        const displayText = aiSummary || rawAbstract;
+        const isAI = !!aiSummary;
+        const label = isAI ? "Resumo (IA)" : article.isMock ? "Resumo" : "Abstract";
+
         return (
           <div className="mb-3">
-            {hasAbstract ? (
+            {displayText ? (
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide">{abstractLabel}</p>
-                  {isEnglish && (
-                    <a
-                      href={`https://translate.google.com/?sl=en&tl=pt-BR&text=${encodeURIComponent(article.abstract_pt)}&op=translate`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1"
-                    >
-                      🌐 Traduzir
-                    </a>
-                  )}
-                </div>
+                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">{label}</p>
                 <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
                   <p className={`text-sm text-foreground/75 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
-                    {article.abstract_pt}
+                    {displayText}
                   </p>
-                  {article.abstract_pt.length > 220 && (
+                  {displayText.length > 220 && (
                     <button
                       onClick={() => setExpandedAbstract(v => !v)}
                       className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
@@ -276,8 +267,8 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
               </div>
             ) : (
               <div className="border border-foreground/8 bg-foreground/[0.02] px-4 py-3 rounded-xl">
-                <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wide mb-2">Resumo não disponível</p>
-                <p className="text-xs text-foreground/50 leading-relaxed">
+                <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wide mb-1.5">Resumo não disponível</p>
+                <p className="text-xs text-foreground/50">
                   {studyInfo.icon} {studyInfo.label}
                   {article.journal && article.journal !== "Periódico não informado" ? ` · ${article.journal}` : ""}
                   {article.year ? ` (${article.year})` : ""}
@@ -290,7 +281,7 @@ const ArticleCard = memo(({ article, onSave, saved }: { article: Article; onSave
                     rel="noopener noreferrer"
                     className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
                   >
-                    <ExternalLink size={10} /> Ver resumo no periódico
+                    <ExternalLink size={10} /> Ver no periódico
                   </a>
                 )}
               </div>
@@ -1434,6 +1425,10 @@ const ResultsView = ({
                   article={art}
                   saved={savedArticles.some((s) => s.title === art.title)}
                   onSave={() => toggleSave(art)}
+                  resumoPt={
+                    result.synthesis.resumos_pt?.[art.doi] ||
+                    result.synthesis.resumos_pt?.[`n/a-${result.articles.indexOf(art)}`]
+                  }
                 />
               ))}
             </div>

@@ -290,6 +290,46 @@ async function fetchEuropePMC(query: string): Promise<Article[]> {
     });
 }
 
+// ─── Semantic Scholar ─────────────────────────────────────────────────────────
+
+async function fetchSemanticScholar(query: string): Promise<Article[]> {
+  const apiKey = process.env.S2_API_KEY;
+  const headers: Record<string, string> = { "User-Agent": "ScholarIA/1.0" };
+  if (apiKey) headers["x-api-key"] = apiKey;
+
+  const fields = "title,authors,year,abstract,citationCount,isOpenAccess,externalIds,publicationTypes";
+  const url =
+    `https://api.semanticscholar.org/graph/v1/paper/search` +
+    `?query=${encodeURIComponent(query)}&limit=12&fields=${fields}`;
+
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`SemanticScholar ${res.status}`);
+
+  const data = (await res.json()) as { data: any[] };
+  return (data.data ?? [])
+    .filter((p) => p.title)
+    .map((p) => {
+      const doi = p.externalIds?.DOI ?? "";
+      const authors = truncateAuthors(
+        (p.authors ?? []).map((a: any) => a.name).filter(Boolean).join(", ")
+      );
+      const types = (p.publicationTypes ?? []).join(" ").toLowerCase();
+      return buildArticle({
+        title: p.title,
+        authors,
+        year: p.year ?? null,
+        journal: p.externalIds?.PubMed ? "PubMed (via S2)" : "Semantic Scholar",
+        source: "Semantic Scholar",
+        citations: p.citationCount ?? 0,
+        is_oa: p.isOpenAccess ?? false,
+        doi,
+        abstract: p.abstract ?? "",
+        studyType: studyTypeFromLabel(types),
+        url: doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${p.paperId}`,
+      });
+    });
+}
+
 // ─── Deduplication ────────────────────────────────────────────────────────────
 
 function normTitle(t: string): string {
@@ -335,6 +375,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchOpenAlex(finalQuery),
     fetchCrossRef(finalQuery),
     fetchEuropePMC(finalQuery),
+    fetchSemanticScholar(finalQuery),
   ]);
 
   const articles: Article[] = [];

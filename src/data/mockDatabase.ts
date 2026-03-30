@@ -61,6 +61,7 @@ export interface Synthesis {
   search_tip: string;
   study_recortes?: string[];
   maturity_label?: string;
+  resumos_pt?: Record<string, string>;
 }
 
 export interface MockEntry {
