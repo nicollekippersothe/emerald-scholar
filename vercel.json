@@ -4,5 +4,9 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/search.ts": { "maxDuration": 30 },
+    "api/summarize.ts": { "maxDuration": 60 }
+  }
 }

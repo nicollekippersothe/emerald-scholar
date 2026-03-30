@@ -80,9 +80,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const url = `${S2_BASE}/paper/search?query=${encodeURIComponent(finalQuery)}&limit=40&fields=${S2_FIELDS}`;
-    const s2Res = await fetch(url, {
-      headers: { "User-Agent": "ScholarIA/1.0 (academic-search-tool)" },
-    });
+    const s2Headers: Record<string, string> = {
+      "User-Agent": "ScholarIA/1.0 (academic-search-tool)",
+    };
+    if (process.env.S2_API_KEY) {
+      s2Headers["x-api-key"] = process.env.S2_API_KEY;
+    }
+    const s2Res = await fetch(url, { headers: s2Headers });
 
     if (!s2Res.ok) {
       throw new Error(`Semantic Scholar retornou ${s2Res.status}`);
