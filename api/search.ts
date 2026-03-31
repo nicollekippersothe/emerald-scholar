@@ -1,6 +1,45 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const MAILTO = "contact@scholaria.app";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+// ─── Query expansion: PT → EN keywords via Groq ───────────────────────────────
+async function expandQueryToEnglish(query: string): Promise<string> {
+  if (!GROQ_API_KEY) return query;
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a biomedical search expert. Extract 3-5 precise English MeSH/academic keywords from the user's query. Reply with ONLY the keywords joined by ' AND ', nothing else. No explanation.",
+          },
+          { role: "user", content: query },
+        ],
+        temperature: 0,
+        max_tokens: 40,
+      }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return query;
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const keywords = data.choices?.[0]?.message?.content?.trim();
+    if (keywords && keywords.length > 3) {
+      console.log(`[api/search] query expandida: "${keywords}"`);
+      return keywords;
+    }
+  } catch (e) {
+    console.warn("[api/search] expansão de query falhou, usando original:", e);
+  }
+  return query;
+}
 
 // ─── Shared article shape ─────────────────────────────────────────────────────
 
@@ -365,11 +404,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const lang = (req.query.lang as string) ?? "";
   if (!q?.trim()) return res.status(400).json({ error: "query obrigatória" });
 
+  // Expandir query PT → termos EN para melhor cobertura nas APIs acadêmicas
+  const expandedQuery = await expandQueryToEnglish(q);
   const langHint =
     lang.includes("pt") || lang.includes("es")
       ? " (Portuguese OR Spanish OR Brasil)"
       : "";
-  const finalQuery = q + langHint;
+  const finalQuery = expandedQuery + langHint;
 
   const results = await Promise.allSettled([
     fetchOpenAlex(finalQuery),
