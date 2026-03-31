@@ -71,9 +71,8 @@ function buildUserPrompt(query: string, articles: ArticleInput[]): string {
         venueType === "conference" ? "Conferência" :
         venueType === "preprint" ? "Preprint" : "Outro";
       const venue = a.journal ? ` | ${a.journal}` : "";
-      const doiKey = a.doi && a.doi !== "n/a" ? a.doi : `n/a-${i + 1}`;
       const abstract = a.abstract_pt?.slice(0, 400) ?? "N/A";
-      return `[${i + 1}] chave:"${doiKey}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}`;
+      return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}`;
     })
     .join("\n\n");
 
@@ -145,7 +144,8 @@ async function callGroq(prompt: string): Promise<string> {
     });
 
     if (res.status === 429 || res.status === 503) {
-      lastError = await res.text();
+      lastError = String(res.status);
+      await res.text(); // drena o body
       console.warn(`[api/summarize] Groq ${model} indisponível (${res.status})`)
       continue;
     }

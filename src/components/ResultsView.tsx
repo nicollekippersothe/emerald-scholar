@@ -1306,7 +1306,11 @@ const ResultsView = ({
             <div className="space-y-4">
               {filteredArticles.slice(0, displayCount).map((art) => {
                 const artIdx = result.articles.indexOf(art);
+                // Chave numérica (1-based) — formato novo e confiável
+                const numKey = String(artIdx + 1);
+                // Fallbacks para formatos antigos (DOI e n/a-X)
                 const doiKey = art.doi && art.doi !== "n/a" ? art.doi : `n/a-${artIdx + 1}`;
+                const summaries = result.synthesis.article_summaries;
                 return (
                 <ArticleCard
                   key={art.doi || art.title}
@@ -1314,12 +1318,14 @@ const ResultsView = ({
                   saved={savedArticles.some((s) => s.title === art.title)}
                   onSave={() => toggleSave(art)}
                   resumoPt={
+                    result.synthesis.resumos_pt?.[numKey] ||
                     result.synthesis.resumos_pt?.[art.doi] ||
                     result.synthesis.resumos_pt?.[`n/a-${artIdx + 1}`]
                   }
                   articleSummary={
-                    result.synthesis.article_summaries?.[doiKey] ||
-                    result.synthesis.article_summaries?.[`n/a-${artIdx + 1}`]
+                    summaries?.[numKey] ||
+                    summaries?.[doiKey] ||
+                    summaries?.[`n/a-${artIdx + 1}`]
                   }
                 />
                 );
