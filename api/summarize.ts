@@ -21,7 +21,7 @@ const FREE_MODEL_FALLBACKS = [
 // Google AI Studio endpoint (Gemini 1.5 Flash — gratuito)
 const GOOGLE_AI_URL = (model: string, key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-const GOOGLE_MODEL = "gemini-1.5-flash";
+const GOOGLE_MODEL = "gemini-2.0-flash";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
