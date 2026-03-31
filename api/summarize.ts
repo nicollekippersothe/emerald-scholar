@@ -209,8 +209,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!query || !articles?.length)
     return res.status(400).json({ error: "query e articles são obrigatórios" });
 
+  // Diagnóstico de chaves — remover após confirmar
+  console.log("[api/summarize] GOOGLE_AI_KEY presente:", !!GOOGLE_AI_KEY, "| OPENROUTER_API_KEY presente:", !!OPENROUTER_API_KEY);
+
   if (!GOOGLE_AI_KEY && !OPENROUTER_API_KEY)
     return res.status(500).json({ error: "Nenhuma chave de API configurada (GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
+
+  // Retornar qual caminho será usado (debug temporário)
+  const usingGoogle = !!GOOGLE_AI_KEY;
+  console.log("[api/summarize] Usando:", usingGoogle ? "Google AI Studio" : "OpenRouter");
 
   try {
     const prompt = buildUserPrompt(query, articles);
