@@ -29,15 +29,15 @@ interface SynthesisPanelProps {
 const VENUE_CONFIG: Record<string, { label: string; cls: string }> = {
   journal: {
     label: "Periódico",
-    cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30",
+    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   },
   conference: {
     label: "Conferência",
-    cls: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30",
+    cls: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   },
   preprint: {
     label: "Preprint",
-    cls: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30",
+    cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   },
   other: {
     label: "Outro",
@@ -47,30 +47,44 @@ const VENUE_CONFIG: Record<string, { label: string; cls: string }> = {
 
 /** ICM score → color/label */
 const icmConfig = (score: number) => {
-  if (score >= 8.5) return { color: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500", label: "Muito forte" };
-  if (score >= 7)   return { color: "text-blue-600 dark:text-blue-400",       bar: "bg-blue-500",    label: "Forte" };
-  if (score >= 5)   return { color: "text-amber-600 dark:text-amber-400",     bar: "bg-amber-500",   label: "Moderado" };
-  return              { color: "text-rose-600 dark:text-rose-400",     bar: "bg-rose-500",    label: "Limitado" };
+  if (score >= 8.5) return { color: "text-emerald-400", bar: "bg-emerald-400", label: "Muito forte" };
+  if (score >= 7)   return { color: "text-blue-400",    bar: "bg-blue-400",    label: "Forte" };
+  if (score >= 5)   return { color: "text-amber-400",   bar: "bg-amber-400",   label: "Moderado" };
+  return              { color: "text-rose-400",   bar: "bg-rose-400",   label: "Limitado" };
 };
 
 function CitationBadge({
   num,
   active,
   onClick,
+  href,
 }: {
   num: number;
   active: boolean;
   onClick: () => void;
+  href?: string;
 }) {
+  const cls = `inline-flex items-center justify-center min-w-[18px] h-[16px] px-1 text-[9px] font-black rounded transition-all mx-0.5 align-middle border ${
+    active
+      ? "bg-primary text-primary-foreground border-primary scale-110 shadow-md shadow-primary/30"
+      : "bg-primary/15 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+  }`;
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className={cls}
+      >
+        {num}
+      </a>
+    );
+  }
   return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center justify-center min-w-[18px] h-[16px] px-1 text-[9px] font-black rounded transition-all mx-0.5 align-middle border ${
-        active
-          ? "bg-primary text-primary-foreground border-primary scale-110 shadow-md shadow-primary/30"
-          : "bg-primary/15 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-      }`}
-    >
+    <button onClick={onClick} className={cls}>
       {num}
     </button>
   );
@@ -79,19 +93,26 @@ function CitationBadge({
 function renderWithCitations(
   text: string,
   activeCite: number | null,
-  onCiteClick: (n: number) => void
+  onCiteClick: (n: number) => void,
+  citedSources: CitedSource[]
 ): React.ReactNode[] {
   const parts = text.split(/(\[\d+\])/g);
   return parts.map((part, i) => {
     const match = part.match(/^\[(\d+)\]$/);
     if (match) {
       const num = +match[1];
+      const src = citedSources.find((s) => s.index === num);
+      const href =
+        src?.doi && src.doi !== "n/a"
+          ? `https://doi.org/${src.doi}`
+          : undefined;
       return (
         <CitationBadge
           key={i}
           num={num}
           active={activeCite === num}
           onClick={() => onCiteClick(num)}
+          href={href}
         />
       );
     }
@@ -246,10 +267,10 @@ const SynthesisPanel = ({
               Ele combina: tipo de estudo (meta-análise = peso máximo), revisão por pares, recência, número de citações e diversidade de fontes.
             </p>
             <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">8,5–10 · Muito forte</span><span className="text-muted-foreground">Meta-análises e revisões Cochrane robustas</span>
-              <span className="text-blue-600 dark:text-blue-400 font-semibold">7,0–8,4 · Forte</span><span className="text-muted-foreground">Múltiplos ECRs e revisões sistemáticas</span>
-              <span className="text-amber-600 dark:text-amber-400 font-semibold">5,0–6,9 · Moderado</span><span className="text-muted-foreground">Coortes, estudos observacionais de qualidade</span>
-              <span className="text-rose-600 dark:text-rose-400 font-semibold">0–4,9 · Limitado</span><span className="text-muted-foreground">Poucos estudos, preprints ou amostras pequenas</span>
+              <span className="text-emerald-400 font-semibold">8,5–10 · Muito forte</span><span className="text-muted-foreground">Meta-análises e revisões Cochrane robustas</span>
+              <span className="text-blue-400 font-semibold">7,0–8,4 · Forte</span><span className="text-muted-foreground">Múltiplos ECRs e revisões sistemáticas</span>
+              <span className="text-amber-400 font-semibold">5,0–6,9 · Moderado</span><span className="text-muted-foreground">Coortes, estudos observacionais de qualidade</span>
+              <span className="text-rose-400 font-semibold">0–4,9 · Limitado</span><span className="text-muted-foreground">Poucos estudos, preprints ou amostras pequenas</span>
             </div>
           </div>
         )}
@@ -307,7 +328,7 @@ const SynthesisPanel = ({
               </span>
             </div>
             <p className="text-sm text-foreground leading-relaxed">
-              {renderWithCitations(synthesisText, activeCite, handleCiteClick)}
+              {renderWithCitations(synthesisText, activeCite, handleCiteClick, citedSources)}
             </p>
             {hasInlineCitations && (
               <p className="text-[10px] text-muted-foreground/50 mt-2.5 pt-2 border-t border-border/60">

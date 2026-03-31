@@ -141,16 +141,16 @@ const ScoreDots = ({ score }: { score: number }) => (
 
 /* ── Evidence level badge colors ── */
 const EVIDENCE_BADGE_CONFIG: Record<string, string> = {
-  "Meta-análise":                  "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/30",
-  "Revisão Sistemática":           "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-400/30",
-  "Ensaio Clínico Randomizado":    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30",
-  "Estudo de Coorte":              "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-400/30",
-  "Estudo Transversal":            "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30",
-  "Estudo Caso-Controle":          "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-400/30",
-  "Preprint não revisado":         "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30",
+  "Meta-análise":                  "bg-emerald-500/15 text-emerald-300 border-emerald-400/30",
+  "Revisão Sistemática":           "bg-teal-500/15 text-teal-300 border-teal-400/30",
+  "Ensaio Clínico Randomizado":    "bg-emerald-500/15 text-emerald-300 border-emerald-400/30",
+  "Estudo de Coorte":              "bg-blue-500/15 text-blue-300 border-blue-400/30",
+  "Estudo Transversal":            "bg-sky-500/15 text-sky-300 border-sky-400/30",
+  "Estudo Caso-Controle":          "bg-sky-500/15 text-sky-300 border-sky-400/30",
+  "Preprint não revisado":         "bg-amber-500/15 text-amber-300 border-amber-400/30",
   "Revisão Narrativa":             "bg-muted text-muted-foreground border-border",
   "Estudo Observacional":          "bg-muted text-muted-foreground border-border",
-  "Relato de Caso":                "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30",
+  "Relato de Caso":                "bg-rose-500/15 text-rose-300 border-rose-400/30",
 };
 
 /* ── Article Card with Chat ── */

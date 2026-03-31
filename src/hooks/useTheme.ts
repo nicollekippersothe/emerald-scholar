@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export type Theme = "light" | "dark";
+export type Theme = "dark" | "light";
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -12,7 +12,8 @@ export function useTheme() {
   });
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    // Default (no class) = dark green; .light = light mode
+    document.documentElement.classList.toggle("light", theme === "light");
     try {
       localStorage.setItem("sl_theme", theme);
     } catch {}
