@@ -5,10 +5,7 @@ import {
   ArrowRight,
   Search,
   Zap,
-  Bot,
   AlertTriangle,
-  CheckCircle2,
-  XCircle,
   Info,
   BookOpen,
   FileText,
@@ -22,7 +19,6 @@ import {
   Shield,
   Download,
   BarChart3,
-  Link2,
   MessageCircle,
   MessageSquarePlus,
   Loader2,
@@ -31,6 +27,7 @@ import {
   Moon,
   FlaskConical,
   Lightbulb,
+  Menu,
 } from "lucide-react";
 import PlansModal from "@/components/PlansModal";
 import FeedbackModal from "@/components/FeedbackModal";
@@ -39,7 +36,7 @@ import PromoCodeModal from "@/components/PromoCodeModal";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import SynthesisPanel from "@/components/SynthesisPanel";
 import { useQueryIntention } from "@/hooks/useQueryIntention";
-import { type MockEntry, type Article, type ArticleSummary, STUDY_TYPE_MAP, EVIDENCE_LABELS, CONFIDENCE_EXPLANATIONS, SOURCE_LIST } from "@/data/mockDatabase";
+import { type MockEntry, type Article, type ArticleSummary, STUDY_TYPE_MAP, EVIDENCE_LABELS, SOURCE_LIST } from "@/data/mockDatabase";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -50,11 +47,11 @@ const SC_BADGES = [
 ];
 
 const TABS = [
-  { id: "search", label: "Pesquisar", icon: Search, count: null },
-  { id: "analysis", label: "Análises", icon: BarChart3, count: null },
-  { id: "references", label: "Referências", icon: FileText, count: null },
-  { id: "split", label: "Split PDF", icon: FileSearch, count: null },
-  { id: "saved", label: "Meus Salvos", icon: Bookmark, count: null },
+  { id: "search",     label: "Pesquisar",   short: "Busca",   icon: Search,    count: null },
+  { id: "analysis",   label: "Análises",    short: "Análise", icon: BarChart3, count: null },
+  { id: "references", label: "Referências", short: "Refs",    icon: FileText,  count: null },
+  { id: "split",      label: "Split PDF",   short: "PDF",     icon: FileSearch,count: null },
+  { id: "saved",      label: "Meus Salvos", short: "Salvos",  icon: Bookmark,  count: null },
 ];
 
 const VERIFICATION_STEPS = [
@@ -669,24 +666,24 @@ const VerificationGuide = () => {
 };
 
 /* ── Tab: Análises ── */
-const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) => (
+const AnalysisTab = ({ result }: { result: MockEntry }) => (
   <div className="space-y-6">
     <div className="bg-card/40 border border-foreground/5 rounded-2xl p-5">
       <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
         <BarChart3 size={16} className="text-primary" /> Análise Metodológica
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <div className="bg-foreground/[0.03] rounded-xl p-4 border border-foreground/5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total de estudos</span>
-          <div className="text-2xl font-extrabold text-foreground mt-1">{result.count}</div>
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="bg-foreground/[0.03] rounded-xl p-3 sm:p-4 border border-foreground/5 text-center sm:text-left">
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight block">Total</span>
+          <div className="text-xl sm:text-2xl font-extrabold text-foreground mt-1">{result.count}</div>
         </div>
-        <div className="bg-foreground/[0.03] rounded-xl p-4 border border-foreground/5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Avaliados por pares</span>
-          <div className="text-2xl font-extrabold text-foreground mt-1">{result.articles.filter(a => a.expert_reviewed).length}/{result.articles.length}</div>
+        <div className="bg-foreground/[0.03] rounded-xl p-3 sm:p-4 border border-foreground/5 text-center sm:text-left">
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight block">Revisados</span>
+          <div className="text-xl sm:text-2xl font-extrabold text-foreground mt-1">{result.articles.filter(a => a.expert_reviewed).length}<span className="text-sm text-muted-foreground">/{result.articles.length}</span></div>
         </div>
-        <div className="bg-foreground/[0.03] rounded-xl p-4 border border-foreground/5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Acesso aberto</span>
-          <div className="text-2xl font-extrabold text-foreground mt-1">{result.articles.filter(a => a.is_oa).length}/{result.articles.length}</div>
+        <div className="bg-foreground/[0.03] rounded-xl p-3 sm:p-4 border border-foreground/5 text-center sm:text-left">
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight block">Ac. aberto</span>
+          <div className="text-xl sm:text-2xl font-extrabold text-foreground mt-1">{result.articles.filter(a => a.is_oa).length}<span className="text-sm text-muted-foreground">/{result.articles.length}</span></div>
         </div>
       </div>
 
@@ -701,7 +698,7 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
           const info = STUDY_TYPE_MAP[type] || { icon: "📄", label: type };
           return (
             <div key={type} className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-foreground/70 w-48">{info.icon} {info.label}</span>
+              <span className="text-xs font-semibold text-foreground/70 w-28 sm:w-48 truncate shrink-0">{info.icon} {info.label}</span>
               <div className="flex-1 bg-foreground/5 rounded-full h-2 overflow-hidden">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${(count / result.articles.length) * 100}%` }} />
               </div>
@@ -723,7 +720,7 @@ const AnalysisTab = ({ result, query }: { result: MockEntry; query: string }) =>
           const badge = SC_BADGES.find(b => b.name === source);
           return (
             <div key={source} className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-foreground/70 w-48" style={{ color: badge?.color }}>{source}</span>
+              <span className="text-xs font-semibold w-28 sm:w-48 truncate shrink-0" style={{ color: badge?.color || undefined }}>{source}</span>
               <div className="flex-1 bg-foreground/5 rounded-full h-2 overflow-hidden">
                 <div className="h-full rounded-full" style={{ backgroundColor: badge?.color || '#666', width: `${(count / result.articles.length) * 100}%` }} />
               </div>
@@ -878,7 +875,7 @@ const SplitPdfTab = ({ onTriggeDev }: { onTriggeDev: () => void }) => {
         <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileClick} />
       </label>
       <p className="text-xs text-muted-foreground mt-4">
-        Em desenvolvimento · Teste as buscas akademcias enquanto isso
+        Em desenvolvimento · Teste as buscas acadêmicas enquanto isso
       </p>
     </div>
   );
@@ -952,13 +949,14 @@ const ResultsView = ({
   const [showPlans, setShowPlans] = useState(false);
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [displayCount, setDisplayCount] = useState(5);
-  const [pdfUnlocked, setPdfUnlocked] = useState(false);
+  const [, setPdfUnlocked] = useState(false);
   const [showPromo, setShowPromo] = useState(false);
   const [showDev, setShowDev] = useState(false);
   const [sortOrder, setSortOrder] = useState<"relevancia" | "recentes" | "evidencia" | "citacoes">("relevancia");
   const [showFeedback, setShowFeedback] = useState(false);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [ptEsFilter, setPtEsFilter] = useState(false);
   const scrollPosRef = useRef<Record<string, number>>({});
 
@@ -1034,44 +1032,90 @@ const ResultsView = ({
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-foreground/10">
-        <div className="flex items-center gap-3">
-          <BrainCircuit className="text-primary size-6" />
-          <button onClick={onBack} className="flex items-center">
-            <h1 className="text-xl font-extrabold tracking-tight">
-              Scholar<span className="text-primary">IA</span>
-            </h1>
-          </button>
-          <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">
-            BETA
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/fontes"
-            className="hidden sm:block border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
-          >
-            Nossas Fontes
-          </Link>
-          <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
-            {searchesLeft} buscas restantes
-          </div>
-          <button
-            onClick={() => setShowPlans(true)}
-            className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
-          >
-            Planos
-          </button>
-          {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
-              className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+      <header className="relative border-b border-foreground/10">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <BrainCircuit className="text-primary size-6 shrink-0" />
+            <button onClick={onBack} className="flex items-center">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight">
+                Scholar<span className="text-primary">IA</span>
+              </h1>
             </button>
-          )}
+            <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">
+              BETA
+            </span>
+          </div>
+
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-3">
+            <Link
+              to="/fontes"
+              className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              Nossas Fontes
+            </Link>
+            <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
+              {searchesLeft} buscas
+            </div>
+            <button
+              onClick={() => setShowPlans(true)}
+              className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              Planos
+            </button>
+            {onToggleTheme && (
+              <button
+                onClick={onToggleTheme}
+                aria-label={theme === "dark" ? "Modo claro" : "Modo escuro"}
+                className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            )}
+          </div>
+
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-2">
+            {onToggleTheme && (
+              <button
+                onClick={onToggleTheme}
+                aria-label={theme === "dark" ? "Modo claro" : "Modo escuro"}
+                className="border border-foreground/20 p-2 rounded-lg text-foreground/60"
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            )}
+            <button
+              onClick={() => setMobileMenuOpen(v => !v)}
+              aria-label="Menu"
+              className="border border-foreground/20 p-2 rounded-lg text-foreground/60"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-foreground/10 bg-background/98 px-4 py-3 space-y-2 z-50">
+            <Link
+              to="/fontes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl border border-foreground/10 text-sm font-medium text-foreground/80"
+            >
+              <BookOpen size={15} className="text-primary" /> Nossas Fontes
+            </Link>
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-foreground/10 text-sm text-primary font-semibold">
+              <Search size={15} /> {searchesLeft} buscas restantes
+            </div>
+            <button
+              onClick={() => { setShowPlans(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl border border-foreground/10 text-sm font-medium text-foreground/80"
+            >
+              <Zap size={15} className="text-primary" /> Ver planos
+            </button>
+          </div>
+        )}
       </header>
 
       <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
@@ -1143,31 +1187,26 @@ const ResultsView = ({
         </form>
 
         {/* TABS */}
-        <div className="flex items-center gap-1 bg-card/40 border border-foreground/5 rounded-2xl p-1.5 mb-6 overflow-x-auto">
+        <div className="flex items-center gap-1 bg-card/40 border border-foreground/5 rounded-2xl p-1.5 mb-6">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               aria-label={`Aba ${tab.label}`}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${
+              className={`flex flex-1 items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
                 activeTab === tab.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <tab.icon size={15} />
-              {tab.label}
-              {tab.id === "saved" && savedArticles.length > 0 ? (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+              <tab.icon size={14} />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.short}</span>
+              {tab.id === "saved" && savedArticles.length > 0 && (
+                <span className={`text-[9px] px-1 py-0.5 rounded ${
                   activeTab === tab.id ? "bg-primary-foreground/20" : "bg-foreground/10"
                 }`}>
                   {savedArticles.length}
-                </span>
-              ) : tab.count !== null && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-foreground/10"
-                }`}>
-                  {tab.count}
                 </span>
               )}
             </button>
@@ -1175,7 +1214,7 @@ const ResultsView = ({
         </div>
 
         {/* TAB CONTENT */}
-        {activeTab === "analysis" && <AnalysisTab result={result} query={query} />}
+        {activeTab === "analysis" && <AnalysisTab result={result} />}
         {activeTab === "references" && <ReferencesTab result={result} />}
         {activeTab === "split" && <SplitPdfTab onTriggeDev={() => setShowDev(true)} />}
         {activeTab === "saved" && (

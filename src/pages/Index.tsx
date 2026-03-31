@@ -15,6 +15,8 @@ import {
   FileSearch,
   Sun,
   Moon,
+  Menu,
+  Zap,
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { type MockEntry } from "@/data/mockDatabase";
@@ -61,6 +63,7 @@ const Index = () => {
   const [showPlans, setShowPlans] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -187,43 +190,86 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-foreground/10">
-        <div className="flex items-center gap-3">
-          <BrainCircuit className="text-primary size-6" />
-          <button onClick={handleBack} aria-label="Voltar para o início" className="flex items-center">
-            <h1 className="text-xl font-extrabold tracking-tight">
-              Scholar<span className="text-primary">IA</span>
-            </h1>
-          </button>
-          <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">
-            BETA
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/fontes"
-            className="border border-foreground/20 px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
-          >
-            <span className="hidden sm:inline">Nossas Fontes</span>
-            <span className="sm:hidden">Fontes</span>
-          </Link>
-          <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
-            {searchesLeft} buscas restantes
+      <header className="relative border-b border-foreground/10">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <BrainCircuit className="text-primary size-6 shrink-0" />
+            <button onClick={handleBack} aria-label="Voltar para o início" className="flex items-center">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight">
+                Scholar<span className="text-primary">IA</span>
+              </h1>
+            </button>
+            <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">
+              BETA
+            </span>
           </div>
-          <button
-            onClick={() => setShowPlans(true)}
-            className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
-          >
-            Planos
-          </button>
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
-            className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
-          >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-3">
+            <Link
+              to="/fontes"
+              className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              Nossas Fontes
+            </Link>
+            <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
+              {searchesLeft} buscas
+            </div>
+            <button
+              onClick={() => setShowPlans(true)}
+              className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              Planos
+            </button>
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Modo claro" : "Modo escuro"}
+              className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
+
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Modo claro" : "Modo escuro"}
+              className="border border-foreground/20 p-2 rounded-lg text-foreground/60"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(v => !v)}
+              aria-label="Menu"
+              className="border border-foreground/20 p-2 rounded-lg text-foreground/60"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-foreground/10 bg-background px-4 py-3 space-y-2">
+            <Link
+              to="/fontes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl border border-foreground/10 text-sm font-medium text-foreground/80"
+            >
+              <BookOpen size={15} className="text-primary" /> Nossas Fontes
+            </Link>
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-foreground/10 text-sm text-primary font-semibold">
+              <BrainCircuit size={15} /> {searchesLeft} buscas restantes
+            </div>
+            <button
+              onClick={() => { setShowPlans(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl border border-foreground/10 text-sm font-medium text-foreground/80"
+            >
+              <Zap size={15} className="text-primary" /> Ver planos
+            </button>
+          </div>
+        )}
       </header>
 
       <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
