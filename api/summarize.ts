@@ -144,11 +144,11 @@ async function callGoogleAI(prompt: string): Promise<string> {
 
 // ─── Chamar OpenRouter (com fallback chain para modelos :free) ────────────────
 async function callOpenRouter(prompt: string): Promise<string> {
-  // Se modelo configurado não é :free, tenta direto
-  const isCustomModel = OPENROUTER_MODEL !== FREE_MODEL_FALLBACKS[0];
-  const modelsToTry = isCustomModel
-    ? [OPENROUTER_MODEL]
-    : FREE_MODEL_FALLBACKS;
+  // Monta lista: modelo configurado primeiro, depois os fallbacks (sem duplicata)
+  const modelsToTry = [
+    OPENROUTER_MODEL,
+    ...FREE_MODEL_FALLBACKS.filter((m) => m !== OPENROUTER_MODEL),
+  ];
 
   let lastError = "";
   for (const model of modelsToTry) {
