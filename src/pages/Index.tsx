@@ -202,9 +202,10 @@ const Index = () => {
         <div className="flex items-center gap-3">
           <Link
             to="/fontes"
-            className="hidden sm:block border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
+            className="border border-foreground/20 px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
           >
-            Nossas Fontes
+            <span className="hidden sm:inline">Nossas Fontes</span>
+            <span className="sm:hidden">Fontes</span>
           </Link>
           <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
             {searchesLeft} buscas restantes

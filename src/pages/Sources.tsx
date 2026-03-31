@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { BrainCircuit, ArrowLeft, ExternalLink, ShieldCheck, Globe, BookOpen, FlaskConical, Microscope, ScrollText, Database, Cpu, Building2, Search, FileText } from "lucide-react";
+import { BrainCircuit, ArrowLeft, ExternalLink, ShieldCheck, Globe, BookOpen, FlaskConical, Microscope, ScrollText, Database, Cpu, Building2, Search, FileText, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 
 const SOURCES = [
   {
@@ -174,6 +175,7 @@ const SOURCES = [
 ];
 
 const Sources = () => {
+  const { theme, toggleTheme } = useTheme();
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       {/* HEADER */}
@@ -189,44 +191,55 @@ const Sources = () => {
             BETA
           </span>
         </div>
-        <Link
-          to="/"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={16} /> Voltar à pesquisa
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={15} />
+            <span className="hidden sm:inline">Voltar à pesquisa</span>
+            <span className="sm:hidden">Voltar</span>
+          </Link>
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+            className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
+          >
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-5 py-12">
+      <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         {/* Hero */}
-        <div className="mb-12 text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold mb-6 border border-primary/20">
+        <div className="mb-8 sm:mb-12 text-center">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold mb-5 border border-primary/20">
             <Database size={14} /> 13 BASES SIMULTÂNEAS
           </div>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3">
             Nossas Fontes Científicas
           </h2>
-          <p className="text-foreground/60 max-w-2xl mx-auto leading-relaxed">
-            Cada busca no ScholarIA consulta simultaneamente 13 bases de dados acadêmicas selecionadas pelo rigor
-            científico, cobertura geográfica e diversidade de acesso. Entenda o que cada fonte oferece, suas forças e limitações.
+          <p className="text-foreground/60 max-w-2xl mx-auto leading-relaxed text-sm sm:text-base">
+            Cada busca consulta simultaneamente 13 bases acadêmicas selecionadas pelo rigor científico,
+            cobertura geográfica e diversidade de acesso.
           </p>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-4 mb-8 bg-foreground/[0.03] border border-foreground/5 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-6 sm:mb-8 bg-foreground/[0.03] border border-foreground/5 rounded-xl p-3 sm:p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" /> Revisado por pares
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 inline-block" /> Revisado por pares
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Pode incluir preprints (não revisados)
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 inline-block" /> Inclui preprints
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck size={12} className="text-primary" /> Acesso aberto total
+            <ShieldCheck size={11} className="text-primary shrink-0" /> Acesso aberto
           </div>
         </div>
 
         {/* Source cards */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {SOURCES.map((source) => {
             const Icon = source.icon;
             return (
@@ -236,21 +249,21 @@ const Sources = () => {
               >
                 {/* Card header */}
                 <div
-                  className="flex items-center justify-between p-5 border-b border-foreground/5"
+                  className="flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-foreground/5"
                   style={{ borderLeftColor: source.color, borderLeftWidth: 4 }}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <div
-                      className="p-2.5 rounded-xl"
+                      className="p-2 sm:p-2.5 rounded-xl shrink-0 mt-0.5"
                       style={{ backgroundColor: `${source.color}18` }}
                     >
-                      <Icon size={20} style={{ color: source.color }} />
+                      <Icon size={18} style={{ color: source.color }} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-extrabold text-foreground text-base">{source.name}</h3>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                        <h3 className="font-extrabold text-foreground text-sm sm:text-base leading-tight">{source.name}</h3>
                         <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                          className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full border leading-tight"
                           style={{
                             color: source.color,
                             backgroundColor: `${source.color}15`,
@@ -260,7 +273,7 @@ const Sources = () => {
                           {source.type}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{source.agency}</p>
+                      <p className="text-[11px] text-muted-foreground leading-snug">{source.agency}</p>
                     </div>
                   </div>
                   <a
@@ -275,24 +288,24 @@ const Sources = () => {
                 </div>
 
                 {/* Card body */}
-                <div className="p-5 grid md:grid-cols-2 gap-5">
+                <div className="p-4 sm:p-5 grid sm:grid-cols-2 gap-4 sm:gap-5">
                   {/* Left column */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Cobertura</p>
-                      <p className="text-sm text-foreground/75 leading-relaxed">{source.coverage}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Cobertura</p>
+                      <p className="text-xs sm:text-sm text-foreground/75 leading-relaxed">{source.coverage}</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`w-2 h-2 rounded-full ${source.peerReview ? "bg-emerald-400" : "bg-amber-400"}`}
+                          className={`w-2 h-2 rounded-full shrink-0 ${source.peerReview ? "bg-emerald-400" : "bg-amber-400"}`}
                         />
                         <span className="text-xs text-muted-foreground">
                           {source.peerReview ? "Revisado por pares" : "Inclui preprints"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <ShieldCheck size={11} className="text-primary" />
+                        <ShieldCheck size={11} className="text-primary shrink-0" />
                         <span className="text-xs text-muted-foreground">{source.openAccess}</span>
                       </div>
                     </div>
@@ -301,21 +314,23 @@ const Sources = () => {
                   {/* Right column */}
                   <div className="space-y-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-1.5">Pontos fortes</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-1">Pontos fortes</p>
                       <ul className="space-y-1">
                         {source.strengths.map((s, i) => (
                           <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5">
-                            <span className="text-emerald-500 shrink-0">·</span> {s}
+                            <span className="text-emerald-500 shrink-0 leading-4">·</span>
+                            <span>{s}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-1.5">Limitações</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-1">Limitações</p>
                       <ul className="space-y-1">
                         {source.limitations.map((l, i) => (
                           <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5">
-                            <span className="text-amber-500 shrink-0">·</span> {l}
+                            <span className="text-amber-500 shrink-0 leading-4">·</span>
+                            <span>{l}</span>
                           </li>
                         ))}
                       </ul>
@@ -328,7 +343,7 @@ const Sources = () => {
         </div>
 
         {/* Footer note */}
-        <div className="mt-8 text-center">
+        <div className="mt-6 sm:mt-8 text-center">
           <p className="text-xs text-muted-foreground leading-relaxed">
             O Emerald Scholar utiliza dados demonstrativos nesta versão BETA. Em produção, os resultados virão diretamente das APIs das bases listadas acima.
           </p>
