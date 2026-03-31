@@ -9,11 +9,13 @@ const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-3-12b-it:free";
 
-// Fallback chain de modelos :free caso o principal esteja rate-limited
+// Fallback chain de modelos :free — ordenados por disponibilidade atual
 const FREE_MODEL_FALLBACKS = [
-  "google/gemma-3-12b-it:free",
   "google/gemma-3n-e4b-it:free",
+  "google/gemma-3-12b-it:free",
   "meta-llama/llama-3.2-3b-instruct:free",
+  "mistralai/mistral-7b-instruct:free",
+  "qwen/qwen-2.5-7b-instruct:free",
 ];
 
 // Google AI Studio endpoint (Gemini 1.5 Flash — gratuito)
@@ -171,10 +173,11 @@ async function callOpenRouter(prompt: string): Promise<string> {
       }),
     });
 
-    if (res.status === 429) {
-      // Rate limited — tenta próximo modelo
-      console.warn(`[api/summarize] ${model} rate-limited, tentando próximo...`);
-      lastError = `429 rate-limited`;
+    // Pula para próximo modelo se indisponível/inválido/rate-limited
+    if (res.status === 429 || res.status === 400 || res.status === 404) {
+      const errText = await res.text();
+      console.warn(`[api/summarize] ${model} indisponível (${res.status}): ${errText}`);
+      lastError = `${res.status}: ${errText}`;
       continue;
     }
 
