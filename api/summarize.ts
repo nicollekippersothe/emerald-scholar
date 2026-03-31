@@ -4,26 +4,32 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 export const config = { maxDuration: 60 };
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-// Prioridade: GOOGLE_AI_KEY (gratuito, 1500 req/dia) → OPENROUTER_API_KEY
+// Prioridade: GROQ_API_KEY → GOOGLE_AI_KEY → OPENROUTER_API_KEY
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GOOGLE_AI_KEY = process.env.GOOGLE_AI_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-3-12b-it:free";
 
-// Fallback chain de modelos :free — ordenados por disponibilidade atual
-const FREE_MODEL_FALLBACKS = [
-  "google/gemma-3n-e4b-it:free",
-  "google/gemma-3-12b-it:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "mistralai/mistral-7b-instruct:free",
-  "qwen/qwen-2.5-7b-instruct:free",
+// Groq — 14.400 req/dia grátis, muito rápido
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODELS = [
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "gemma2-9b-it",
 ];
 
-// Google AI Studio endpoint (Gemini 1.5 Flash — gratuito)
+// Google AI Studio endpoint (Gemini 2.0 Flash — gratuito)
 const GOOGLE_AI_URL = (model: string, key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 const GOOGLE_MODEL = "gemini-2.0-flash";
 
+// OpenRouter fallback chain
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const FREE_MODEL_FALLBACKS = [
+  "google/gemma-3n-e4b-it:free",
+  "google/gemma-3-12b-it:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ArticleInput {
@@ -55,7 +61,6 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
 }
 
 function buildUserPrompt(query: string, articles: ArticleInput[]): string {
-  // Limitar a 8 artigos para caber no contexto e reduzir latência
   const top8 = articles.slice(0, 8);
 
   const articlesList = top8
@@ -118,10 +123,51 @@ Retorne APENAS este JSON sem markdown:
 CRÍTICO: article_summaries deve ter uma entrada para CADA um dos ${top8.length} artigos listados, usando a "chave" exata. inline_synthesis mínimo 5 frases com citações [N].`;
 }
 
-// ─── Chamar Google AI Studio (Gemini) ────────────────────────────────────────
+// ─── Groq (principal — 14.400 req/dia grátis, muito rápido) ──────────────────
+async function callGroq(prompt: string): Promise<string> {
+  let lastError = "";
+  for (const model of GROQ_MODELS) {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.25,
+        max_tokens: 4000,
+      }),
+    });
+
+    if (res.status === 429 || res.status === 503) {
+      lastError = await res.text();
+      console.warn(`[api/summarize] Groq ${model} indisponível (${res.status})`)
+      continue;
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Groq ${res.status} (${model}): ${err}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      console.log(`[api/summarize] Groq sucesso: ${model}`);
+      return content;
+    }
+  }
+  throw new Error(`Groq falhou: ${lastError}`);
+}
+
+// ─── Google AI Studio (fallback 1) ───────────────────────────────────────────
 async function callGoogleAI(prompt: string): Promise<string> {
-  const key = GOOGLE_AI_KEY!;
-  const res = await fetch(GOOGLE_AI_URL(GOOGLE_MODEL, key), {
+  const res = await fetch(GOOGLE_AI_URL(GOOGLE_MODEL, GOOGLE_AI_KEY!), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,9 +190,8 @@ async function callGoogleAI(prompt: string): Promise<string> {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 }
 
-// ─── Chamar OpenRouter (com fallback chain para modelos :free) ────────────────
+// ─── OpenRouter (fallback 2) ──────────────────────────────────────────────────
 async function callOpenRouter(prompt: string): Promise<string> {
-  // Monta lista: modelo configurado primeiro, depois os fallbacks (sem duplicata)
   const modelsToTry = [
     OPENROUTER_MODEL,
     ...FREE_MODEL_FALLBACKS.filter((m) => m !== OPENROUTER_MODEL),
@@ -173,11 +218,10 @@ async function callOpenRouter(prompt: string): Promise<string> {
       }),
     });
 
-    // Pula para próximo modelo se indisponível/inválido/rate-limited
     if (res.status === 429 || res.status === 400 || res.status === 404) {
       const errText = await res.text();
-      console.warn(`[api/summarize] ${model} indisponível (${res.status}): ${errText}`);
-      lastError = `${res.status}: ${errText}`;
+      console.warn(`[api/summarize] OpenRouter ${model} indisponível (${res.status})`);
+      lastError = `${res.status}`;
       continue;
     }
 
@@ -189,12 +233,12 @@ async function callOpenRouter(prompt: string): Promise<string> {
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
     if (content) {
-      console.log(`[api/summarize] sucesso com modelo: ${model}`);
+      console.log(`[api/summarize] OpenRouter sucesso: ${model}`);
       return content;
     }
   }
 
-  throw new Error(`Todos os modelos OpenRouter falharam (${lastError}). Configure GOOGLE_AI_KEY para síntese confiável.`);
+  throw new Error(`OpenRouter falhou em todos os modelos (último erro: ${lastError})`);
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -209,30 +253,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!query || !articles?.length)
     return res.status(400).json({ error: "query e articles são obrigatórios" });
 
-  // Diagnóstico de chaves — remover após confirmar
-  console.log("[api/summarize] GOOGLE_AI_KEY presente:", !!GOOGLE_AI_KEY, "| OPENROUTER_API_KEY presente:", !!OPENROUTER_API_KEY);
-
-  if (!GOOGLE_AI_KEY && !OPENROUTER_API_KEY)
-    return res.status(500).json({ error: "Nenhuma chave de API configurada (GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
-
-  // Retornar qual caminho será usado (debug temporário)
-  const usingGoogle = !!GOOGLE_AI_KEY;
-  console.log("[api/summarize] Usando:", usingGoogle ? "Google AI Studio" : "OpenRouter");
+  if (!GROQ_API_KEY && !GOOGLE_AI_KEY && !OPENROUTER_API_KEY)
+    return res.status(500).json({ error: "Nenhuma chave de API configurada (GROQ_API_KEY, GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
 
   try {
     const prompt = buildUserPrompt(query, articles);
 
-    // Tenta Google AI primeiro (gratuito), fallback para OpenRouter
+    // Cadeia de prioridade: Groq → Google AI → OpenRouter
     let raw: string;
-    if (GOOGLE_AI_KEY) {
-      console.log("[api/summarize] usando Google AI Studio");
-      raw = await callGoogleAI(prompt);
+    if (GROQ_API_KEY) {
+      console.log("[api/summarize] tentando Groq");
+      try {
+        raw = await callGroq(prompt);
+      } catch (groqErr) {
+        console.warn("[api/summarize] Groq falhou, tentando fallback:", groqErr);
+        if (GOOGLE_AI_KEY) {
+          console.log("[api/summarize] tentando Google AI");
+          raw = await callGoogleAI(prompt);
+        } else if (OPENROUTER_API_KEY) {
+          console.log("[api/summarize] tentando OpenRouter");
+          raw = await callOpenRouter(prompt);
+        } else {
+          throw groqErr;
+        }
+      }
+    } else if (GOOGLE_AI_KEY) {
+      console.log("[api/summarize] tentando Google AI");
+      try {
+        raw = await callGoogleAI(prompt);
+      } catch (googleErr) {
+        console.warn("[api/summarize] Google AI falhou, tentando OpenRouter:", googleErr);
+        if (OPENROUTER_API_KEY) {
+          raw = await callOpenRouter(prompt);
+        } else {
+          throw googleErr;
+        }
+      }
     } else {
-      console.log("[api/summarize] usando OpenRouter");
+      console.log("[api/summarize] tentando OpenRouter");
       raw = await callOpenRouter(prompt);
     }
 
-    // Limpar possível markdown residual
     const cleaned = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "").trim();
     const synthesis = JSON.parse(cleaned);
 
