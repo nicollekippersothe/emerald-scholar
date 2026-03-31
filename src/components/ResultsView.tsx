@@ -281,7 +281,9 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
       {/* Abstract / AI Summary */}
       {(() => {
         const hasAiSummary = !!(articleSummary?.resumo_popular || articleSummary?.resumo_tecnico);
-        const rawAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
+        // Para artigos reais (não mock), abstract_pt pode estar em inglês (vindo da API Semantic Scholar).
+        // Só exibimos rawAbstract para artigos mock (que têm resumo já em português no banco local).
+        const rawAbstract = article.isMock && article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
         const fallbackText = resumoPt?.trim() || rawAbstract;
         const isShortAbstract = fallbackText.length < 220;
 
