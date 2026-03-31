@@ -172,12 +172,15 @@ const SynthesisPanel = ({
     const next = activeCite === num ? null : num;
     setActiveCite(next);
     if (next !== null) {
-      setTimeout(() => {
-        sidebarRefs.current[next]?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }, 50);
+      // Scroll to article card first; fallback to sidebar entry
+      const articleEl = document.getElementById(`article-${num}`);
+      if (articleEl) {
+        articleEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        setTimeout(() => {
+          sidebarRefs.current[next]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 50);
+      }
     }
   };
 
@@ -248,12 +251,25 @@ const SynthesisPanel = ({
               </p>
             </div>
             <div className="w-px h-10 bg-border" />
-            <div className="text-center">
+            <div
+              className="text-center cursor-help"
+              title={
+                synthesis.confidence_level === "muito alto" || synthesis.confidence_level === "muito alta"
+                  ? "Muito Alta: base sólida de meta-análises e revisões Cochrane com resultados consistentes"
+                  : synthesis.confidence_level === "alto" || synthesis.confidence_level === "alta"
+                  ? "Alta: múltiplos ECRs e revisões sistemáticas convergindo para conclusões similares"
+                  : synthesis.confidence_level === "moderado" || synthesis.confidence_level === "moderada"
+                  ? "Moderada: estudos de qualidade (coortes, observacionais) mas sem meta-análises abrangentes — resultados confiáveis porém não definitivos"
+                  : synthesis.confidence_level === "baixo" || synthesis.confidence_level === "baixa"
+                  ? "Baixa: poucos estudos, amostras pequenas ou resultados divergentes — use com cautela"
+                  : "Nível de confiança geral do conjunto de evidências"
+              }
+            >
               <Gauge size={18} className="text-primary mx-auto mb-0.5" />
               <p className="text-xs font-bold text-foreground capitalize">
                 {synthesis.confidence_level}
               </p>
-              <p className="text-[10px] text-muted-foreground">Confiança</p>
+              <p className="text-[10px] text-muted-foreground">Confiança ⓘ</p>
             </div>
           </div>
         </div>
@@ -292,13 +308,13 @@ const SynthesisPanel = ({
             ))}
         </div>
 
-        {/* Consensus block */}
+        {/* Synthesis block */}
         {synthesisLoading ? (
           <div className="border-l-4 border-primary/40 bg-primary/[0.05] rounded-r-xl pl-4 pr-4 py-4 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <BrainCircuit size={13} className="text-primary/50 shrink-0 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-primary/50">
-                Gerando consenso da ciência...
+                Gerando síntese da evidência...
               </span>
             </div>
             <div className="space-y-2.5 animate-pulse">
@@ -324,7 +340,13 @@ const SynthesisPanel = ({
             <div className="flex items-center gap-2 mb-2">
               <BrainCircuit size={13} className="text-primary shrink-0" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
-                Consenso da Ciência
+                Síntese da Evidência
+              </span>
+              <span
+                className="text-[9px] text-muted-foreground/50 cursor-help"
+                title="Resumo interpretativo gerado pela IA com base nos estudos encontrados. Não representa consenso científico definitivo — consulte os artigos originais."
+              >
+                ⓘ O que é isso?
               </span>
             </div>
             <p className="text-sm text-foreground leading-relaxed">
@@ -332,7 +354,7 @@ const SynthesisPanel = ({
             </p>
             {hasInlineCitations && (
               <p className="text-[10px] text-muted-foreground/50 mt-2.5 pt-2 border-t border-border/60">
-                Toque em [N] para destacar a fonte citada no painel lateral
+                Toque em [N] para ir ao artigo correspondente abaixo
               </p>
             )}
           </div>
@@ -416,29 +438,76 @@ const SynthesisPanel = ({
           {(activeTab === "detalhes" ||
             (!showConsensus && activeTab === "distribuicao")) && (
             <div className="space-y-4">
-              {synthesis.study_recortes && synthesis.study_recortes.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <FlaskConical size={12} className="text-muted-foreground" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      O que os estudos encontraram
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {synthesis.study_recortes.map((r, i) => (
-                      <div
-                        key={i}
-                        className="flex gap-2 p-3 bg-muted/40 rounded-lg border border-border/60"
-                      >
-                        <span className="text-muted-foreground/50 text-xs shrink-0 mt-0.5 font-bold">
-                          {i + 1}.
+              {(() => {
+                const isAutoGenerated = (r: string) =>
+                  /achado com \d+ cit\.|p-valor não disponível/.test(r);
+                const recortes = synthesis.study_recortes ?? [];
+                const useAutoFallback =
+                  recortes.length === 0 || recortes.every(isAutoGenerated);
+
+                if (useAutoFallback && articles.length > 0) {
+                  // Show article-derived summary instead of ugly auto-generated text
+                  return (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <FlaskConical size={12} className="text-muted-foreground" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Estudos encontrados
                         </span>
-                        <p className="text-xs text-foreground/80 leading-relaxed">{r}</p>
                       </div>
-                    ))}
+                      <div className="space-y-2">
+                        {articles.slice(0, 6).map((art, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              const el = document.getElementById(`article-${i + 1}`);
+                              if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }}
+                            className="w-full flex gap-2 p-3 bg-muted/40 rounded-lg border border-border/60 hover:border-primary/30 transition-colors text-left"
+                          >
+                            <span className="text-muted-foreground/50 text-xs shrink-0 mt-0.5 font-bold w-4">
+                              {i + 1}.
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs text-foreground/80 leading-snug font-medium line-clamp-2">
+                                {art.title}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {art.authors.split(",")[0].trim()}{art.authors.includes(",") ? " et al." : ""} · {art.year}
+                                {art.citations > 0 ? ` · ${art.citations.toLocaleString("pt-BR")} cit.` : ""}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <FlaskConical size={12} className="text-muted-foreground" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        O que os estudos encontraram
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {recortes.map((r, i) => (
+                        <div
+                          key={i}
+                          className="flex gap-2 p-3 bg-muted/40 rounded-lg border border-border/60"
+                        >
+                          <span className="text-muted-foreground/50 text-xs shrink-0 mt-0.5 font-bold">
+                            {i + 1}.
+                          </span>
+                          <p className="text-xs text-foreground/80 leading-relaxed">{r}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
               {synthesis.inconclusive_summary && (
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 block">
@@ -453,6 +522,9 @@ const SynthesisPanel = ({
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">
                     Qualidade da evidência
+                    <span className="text-muted-foreground/50 font-normal normal-case tracking-normal ml-1">
+                      — por que a confiança é este nível?
+                    </span>
                   </span>
                   {synthesis.confidence_reasons.map((r, i) => (
                     <p key={i} className="text-xs text-foreground/65 mt-1">
@@ -493,6 +565,61 @@ const SynthesisPanel = ({
                   </p>
                 </div>
               )}
+
+              {/* Derived stats — always shown */}
+              {articles.length > 0 && (() => {
+                const topCited = [...articles].sort((a, b) => b.citations - a.citations)[0];
+                const mostRecent = [...articles].sort((a, b) => parseInt(b.year) - parseInt(a.year))[0];
+                const oa = articles.filter(a => a.is_oa).length;
+                const highEvidence = articles.filter(a => a.evidence_score >= 4).length;
+                return (
+                  <div className="pt-2 border-t border-border/60 space-y-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+                      Perfil dos estudos encontrados
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-muted/40 rounded-lg p-2.5 border border-border/60">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground font-bold mb-0.5">Alta evidência</p>
+                        <p className="text-lg font-black text-foreground">{highEvidence}<span className="text-xs font-normal text-muted-foreground">/{articles.length}</span></p>
+                        <p className="text-[9px] text-muted-foreground">revisões/meta-análises</p>
+                      </div>
+                      <div className="bg-muted/40 rounded-lg p-2.5 border border-border/60">
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground font-bold mb-0.5">Acesso aberto</p>
+                        <p className="text-lg font-black text-foreground">{oa}<span className="text-xs font-normal text-muted-foreground">/{articles.length}</span></p>
+                        <p className="text-[9px] text-muted-foreground">disponíveis livremente</p>
+                      </div>
+                    </div>
+                    {topCited && (
+                      <button
+                        onClick={() => {
+                          const idx = articles.indexOf(topCited);
+                          const el = document.getElementById(`article-${idx + 1}`);
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="w-full text-left p-2.5 bg-muted/40 rounded-lg border border-border/60 hover:border-primary/30 transition-colors"
+                      >
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground font-bold mb-0.5">Mais citado</p>
+                        <p className="text-xs text-foreground/80 font-medium line-clamp-1">{topCited.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{topCited.citations.toLocaleString("pt-BR")} citações · {topCited.year}</p>
+                      </button>
+                    )}
+                    {mostRecent && mostRecent !== topCited && (
+                      <button
+                        onClick={() => {
+                          const idx = articles.indexOf(mostRecent);
+                          const el = document.getElementById(`article-${idx + 1}`);
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="w-full text-left p-2.5 bg-muted/40 rounded-lg border border-border/60 hover:border-primary/30 transition-colors"
+                      >
+                        <p className="text-[9px] uppercase tracking-wide text-muted-foreground font-bold mb-0.5">Mais recente</p>
+                        <p className="text-xs text-foreground/80 font-medium line-clamp-1">{mostRecent.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{mostRecent.year} · {mostRecent.journal}</p>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

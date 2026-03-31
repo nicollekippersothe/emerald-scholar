@@ -116,11 +116,25 @@ const getContextualAnswer = (q: string, article: Article): string => {
   return `⚠️ Esta informação específica não consta no resumo disponível deste artigo. O resumo aborda: "${abstract.substring(0, 150)}..." Para obter essa informação, acesse o artigo completo em doi.org/${article.doi || "[DOI]"}.`;
 };
 
+/* ── Study type description tooltips ── */
+const STUDY_TYPE_DESCRIPTIONS: Record<string, string> = {
+  "meta-análise": "Meta-análise: combina estatisticamente resultados de múltiplos estudos — nível máximo de evidência na pirâmide científica",
+  "revisão sistemática": "Revisão Sistemática: busca exaustiva e análise crítica de toda a literatura disponível sobre um tema",
+  "ensaio clínico randomizado": "Ensaio Clínico Randomizado (ECR): participantes alocados aleatoriamente em grupos — padrão-ouro para testar intervenções",
+  "coorte": "Estudo de Coorte: acompanha grupos ao longo do tempo para observar desfechos — bom para estudar causas",
+  "estudo observacional": "Estudo Observacional: observa sem intervir — útil para hipóteses, mas não prova causalidade",
+  "transversal": "Estudo Transversal: foto instantânea de uma população — rápido mas não mostra evolução temporal",
+  "caso-controle": "Estudo Caso-Controle: compara quem desenvolveu doença vs. quem não desenvolveu — útil para doenças raras",
+  "revisão narrativa": "Revisão Narrativa: síntese subjetiva da literatura, sem metodologia sistemática — útil para contextualizar, mas suscetível a viés de seleção",
+  "relato de caso": "Relato de Caso: descrição detalhada de um paciente individual — baixa generalização, útil para fenômenos raros",
+  "preprint": "Preprint: manuscrito ainda não submetido a revisão por pares — resultados preliminares, use com cautela",
+};
+
 /* ── Score dots ── */
 const ScoreDots = ({ score }: { score: number }) => (
   <div
     className="flex items-center gap-1 cursor-help"
-    title={`Evidência ${score}/5: 1=Opinião · 2=Caso clínico · 3=Coorte/Observacional · 4=Revisão sistemática · 5=Meta-análise`}
+    title={`Nível de Evidência (design metodológico) ${score}/5:\n1 = Opinião de especialista\n2 = Relato de caso / Estudo transversal\n3 = Coorte / Observacional\n4 = Ensaio Clínico Randomizado / Revisão Sistemática\n5 = Meta-análise\n\nNota: este score mede o TIPO de estudo, não a qualidade individual. Um score 3 não significa estudo ruim — veja também a Confiabilidade abaixo.`}
   >
     {[1, 2, 3, 4, 5].map((i) => (
       <div
@@ -236,7 +250,12 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
 
       {/* Score */}
       <div className="mb-3 space-y-2">
-        <ScoreDots score={article.evidence_score} />
+        <div
+          className="cursor-help"
+          title="Nível de Evidência: indica o TIPO de metodologia (1=opinião → 5=meta-análise). Um score 3 não significa estudo fraco — um coorte bem conduzido pode ter alta confiabilidade."
+        >
+          <ScoreDots score={article.evidence_score} />
+        </div>
         <ConfidenceBadge score={article.confidence_score} factors={article.confidence_factors} />
       </div>
 
@@ -255,7 +274,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             ✓ Avaliado por especialistas
           </span>
         )}
-        <span className="bg-foreground/5 text-foreground/60 border border-foreground/10 px-2 py-0.5 rounded text-[10px] font-semibold">
+        <span
+          className="bg-foreground/5 text-foreground/60 border border-foreground/10 px-2 py-0.5 rounded text-[10px] font-semibold cursor-help"
+          title={STUDY_TYPE_DESCRIPTIONS[article.study_type] ?? `Tipo de estudo: ${article.study_type}`}
+        >
           {studyInfo.icon} {studyInfo.label}
         </span>
         {article.citations > 0 && (
@@ -1014,8 +1036,13 @@ const ResultsView = ({
   };
 
   const PT_ES_SOURCES = ["SciELO", "BVS/LILACS"];
+  const seenTitles = new Set<string>();
   const filteredArticles = result.articles
     .filter((a) => {
+      // Front-end dedup by normalized title (catches same paper from multiple APIs)
+      const nt = a.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 55);
+      if (seenTitles.has(nt)) return false;
+      seenTitles.add(nt);
       if (scoreFilter > 0 && a.evidence_score < scoreFilter) return false;
       if (sourceFilter !== "Todas" && a.source !== sourceFilter) return false;
       if (expertFilter && !a.expert_reviewed) return false;
@@ -1424,23 +1451,24 @@ const ResultsView = ({
                 const doiKey = art.doi && art.doi !== "n/a" ? art.doi : `n/a-${artIdx + 1}`;
                 const summaries = result.synthesis.article_summaries;
                 return (
-                <ArticleCard
-                  key={art.doi || art.title}
-                  article={art}
-                  saved={savedArticles.some((s) => s.title === art.title)}
-                  onSave={() => toggleSave(art)}
-                  resumoPt={
-                    result.synthesis.resumos_pt?.[numKey] ||
-                    result.synthesis.resumos_pt?.[art.doi] ||
-                    result.synthesis.resumos_pt?.[`n/a-${artIdx + 1}`]
-                  }
-                  articleSummary={
-                    summaries?.[numKey] ||
-                    summaries?.[doiKey] ||
-                    summaries?.[`n/a-${artIdx + 1}`]
-                  }
-                  query={query}
-                />
+                  <div key={art.doi || art.title} id={`article-${artIdx + 1}`}>
+                    <ArticleCard
+                      article={art}
+                      saved={savedArticles.some((s) => s.title === art.title)}
+                      onSave={() => toggleSave(art)}
+                      resumoPt={
+                        result.synthesis.resumos_pt?.[numKey] ||
+                        result.synthesis.resumos_pt?.[art.doi] ||
+                        result.synthesis.resumos_pt?.[`n/a-${artIdx + 1}`]
+                      }
+                      articleSummary={
+                        summaries?.[numKey] ||
+                        summaries?.[doiKey] ||
+                        summaries?.[`n/a-${artIdx + 1}`]
+                      }
+                      query={query}
+                    />
+                  </div>
                 );
               })}
             </div>
