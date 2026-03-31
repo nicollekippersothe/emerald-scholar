@@ -294,8 +294,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       raw = await callOpenRouter(prompt);
     }
 
-    const cleaned = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "").trim();
-    const synthesis = JSON.parse(cleaned);
+    // Remove qualquer bloco markdown (```json ... ``` ou ``` ... ```)
+    const cleaned = raw.replace(/^```[\w]*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+    // Extrai só o JSON caso haja texto antes/depois
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const jsonStr = jsonStart !== -1 && jsonEnd !== -1 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const synthesis = JSON.parse(jsonStr);
 
     return res.status(200).json({ synthesis });
   } catch (err) {
