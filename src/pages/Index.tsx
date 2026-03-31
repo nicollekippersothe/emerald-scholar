@@ -13,7 +13,10 @@ import {
   FileText,
   Link2,
   FileSearch,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import { type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
 import PlansModal from "@/components/PlansModal";
@@ -57,6 +60,7 @@ const Index = () => {
   });
   const [showPlans, setShowPlans] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -174,6 +178,8 @@ const Index = () => {
         onBack={handleBack}
         synthesisLoading={synthesisLoading}
         synthesisFailed={synthesisFailed}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -208,6 +214,13 @@ const Index = () => {
             className="border border-foreground/20 px-4 py-1.5 rounded-lg text-sm font-medium text-foreground/80 hover:text-primary hover:border-primary/30 transition-colors"
           >
             Planos
+          </button>
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+            className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
       </header>

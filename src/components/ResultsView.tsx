@@ -27,6 +27,10 @@ import {
   MessageSquarePlus,
   Loader2,
   Bookmark,
+  Sun,
+  Moon,
+  FlaskConical,
+  Lightbulb,
 } from "lucide-react";
 import PlansModal from "@/components/PlansModal";
 import FeedbackModal from "@/components/FeedbackModal";
@@ -77,6 +81,8 @@ interface ResultsViewProps {
   onBack: () => void;
   synthesisLoading?: boolean;
   synthesisFailed?: boolean;
+  theme?: string;
+  onToggleTheme?: () => void;
 }
 
 /* ── Hallucination-filtered chat answer ── */
@@ -135,25 +141,26 @@ const ScoreDots = ({ score }: { score: number }) => (
 
 /* ── Evidence level badge colors ── */
 const EVIDENCE_BADGE_CONFIG: Record<string, string> = {
-  "Meta-análise":                  "bg-purple-900/50 text-purple-300 border-purple-700/60",
-  "Revisão Sistemática":           "bg-violet-900/50 text-violet-300 border-violet-700/60",
-  "Ensaio Clínico Randomizado":    "bg-emerald-900/50 text-emerald-300 border-emerald-700/60",
-  "Estudo de Coorte":              "bg-blue-900/50 text-blue-300 border-blue-700/60",
-  "Estudo Transversal":            "bg-sky-900/50 text-sky-300 border-sky-700/60",
-  "Estudo Caso-Controle":          "bg-indigo-900/50 text-indigo-300 border-indigo-700/60",
-  "Preprint não revisado":         "bg-amber-900/50 text-amber-300 border-amber-700/60",
-  "Revisão Narrativa":             "bg-slate-800 text-slate-400 border-slate-700",
-  "Estudo Observacional":          "bg-slate-800 text-slate-400 border-slate-700",
-  "Relato de Caso":                "bg-rose-900/50 text-rose-300 border-rose-700/60",
+  "Meta-análise":                  "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/30",
+  "Revisão Sistemática":           "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-400/30",
+  "Ensaio Clínico Randomizado":    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30",
+  "Estudo de Coorte":              "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-400/30",
+  "Estudo Transversal":            "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30",
+  "Estudo Caso-Controle":          "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-400/30",
+  "Preprint não revisado":         "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30",
+  "Revisão Narrativa":             "bg-muted text-muted-foreground border-border",
+  "Estudo Observacional":          "bg-muted text-muted-foreground border-border",
+  "Relato de Caso":                "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30",
 };
 
 /* ── Article Card with Chat ── */
-const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary }: {
+const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, query }: {
   article: Article;
   onSave: () => void;
   saved: boolean;
   resumoPt?: string;
   articleSummary?: ArticleSummary;
+  query?: string;
 }) => {
   const [copiedAbnt, setCopiedAbnt] = useState(false);
   const [showAbnt, setShowAbnt] = useState(false);
@@ -266,7 +273,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary }: 
         <div className="mb-2">
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-              EVIDENCE_BADGE_CONFIG[articleSummary.evidence_level_badge] ?? "bg-slate-800 text-slate-400 border-slate-700"
+              EVIDENCE_BADGE_CONFIG[articleSummary.evidence_level_badge] ?? "bg-muted text-muted-foreground border-border"
             }`}
           >
             🔬 {articleSummary.evidence_level_badge}
@@ -279,9 +286,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary }: 
         const hasAiSummary = !!(articleSummary?.resumo_popular || articleSummary?.resumo_tecnico);
         const rawAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
         const fallbackText = resumoPt?.trim() || rawAbstract;
+        const isShortAbstract = fallbackText.length < 220;
 
         return (
-          <div className="mb-3">
+          <div className="mb-4 space-y-3">
             {hasAiSummary ? (
               <div>
                 {/* Tab switcher */}
@@ -309,55 +317,107 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary }: 
                 </div>
 
                 {summaryTab === "popular" && (
-                  <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
-                    <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
-                      Resumo popular (IA)
+                  <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <Lightbulb size={10} /> Em linguagem simples
                     </p>
-                    <p className="text-sm text-foreground/80 leading-relaxed">
-                      {articleSummary.resumo_popular || "Resumo não disponível."}
+                    <p className="text-sm text-foreground/85 leading-relaxed">
+                      {articleSummary.resumo_popular}
                     </p>
                   </div>
                 )}
 
                 {summaryTab === "tecnico" && (
-                  <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
-                    <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
-                      Resumo técnico (IA)
+                  <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <FlaskConical size={10} /> Resumo técnico
                     </p>
-                    <p className="text-sm text-foreground/75 leading-relaxed font-mono text-xs">
-                      {articleSummary.resumo_tecnico || "Resumo técnico não disponível."}
+                    <p className="text-sm text-foreground/75 leading-relaxed">
+                      {articleSummary.resumo_tecnico}
                     </p>
+                  </div>
+                )}
+
+                {/* Relevance to query */}
+                {query && article.evidence_reason && (
+                  <div className="bg-primary/[0.06] px-4 py-3 rounded-xl border border-primary/15">
+                    <p className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1.5">
+                      Relevância para "{query.length > 40 ? query.slice(0, 40) + "…" : query}"
+                    </p>
+                    <p className="text-xs text-foreground/70 leading-relaxed">{article.evidence_reason}</p>
                   </div>
                 )}
               </div>
             ) : fallbackText ? (
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide mb-1.5">
-                  {resumoPt ? "Resumo (IA)" : article.isMock ? "Resumo" : "Abstract"}
-                </p>
-                <div className="bg-background/60 px-4 pt-3 pb-3 rounded-xl border border-foreground/5">
-                  <p className={`text-sm text-foreground/75 leading-relaxed ${expandedAbstract ? "" : "line-clamp-3"}`}>
+              <div className="space-y-2.5">
+                {/* Main abstract block */}
+                <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2">
+                    {resumoPt ? "Resumo (IA)" : article.isMock ? "Sobre este estudo" : "Abstract"}
+                  </p>
+                  <p className={`text-sm text-foreground/80 leading-relaxed ${!expandedAbstract && fallbackText.length > 320 ? "line-clamp-4" : ""}`}>
                     {fallbackText}
                   </p>
-                  {fallbackText.length > 220 && (
+                  {fallbackText.length > 320 && (
                     <button
                       onClick={() => setExpandedAbstract(v => !v)}
-                      className="mt-2 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                      className="mt-2 text-[11px] text-primary hover:text-primary/80 transition-colors font-semibold"
                     >
                       {expandedAbstract ? "▲ Recolher" : "▼ Ver completo"}
                     </button>
                   )}
                 </div>
+
+                {/* Evidence reason — always show when abstract is short */}
+                {article.evidence_reason && (isShortAbstract || true) && (
+                  <div className="bg-primary/[0.06] px-4 py-3 rounded-xl border border-primary/15">
+                    <p className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                      <FlaskConical size={10} />
+                      {query
+                        ? `Relevância para "${query.length > 35 ? query.slice(0, 35) + "…" : query}"`
+                        : "Por que este estudo importa"}
+                    </p>
+                    <p className="text-xs text-foreground/70 leading-relaxed">{article.evidence_reason}</p>
+                  </div>
+                )}
+
+                {/* Extra context when abstract is very sparse */}
+                {isShortAbstract && (
+                  <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                    <span className="bg-muted px-2 py-1 rounded-md border border-border">
+                      {studyInfo.icon} {studyInfo.label}
+                    </span>
+                    {article.journal && article.journal !== "Periódico não informado" && (
+                      <span className="bg-muted px-2 py-1 rounded-md border border-border">{article.journal}</span>
+                    )}
+                    {article.citations > 0 && (
+                      <span className="bg-muted px-2 py-1 rounded-md border border-border">{article.citations.toLocaleString()} citações</span>
+                    )}
+                    {(article.url || article.doi) && (
+                      <a
+                        href={article.url || `https://doi.org/${article.doi}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15 transition-colors"
+                      >
+                        <ExternalLink size={9} /> Ver artigo completo
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="border border-foreground/8 bg-foreground/[0.02] px-4 py-3 rounded-xl">
-                <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-wide mb-1.5">Resumo não disponível</p>
-                <p className="text-xs text-foreground/50">
-                  {studyInfo.icon} {studyInfo.label}
-                  {article.journal && article.journal !== "Periódico não informado" ? ` · ${article.journal}` : ""}
-                  {article.year ? ` (${article.year})` : ""}
-                  {article.citations > 0 ? ` · ${article.citations.toLocaleString()} citações` : ""}
-                </p>
+              <div className="bg-muted/30 border border-border/60 px-4 py-4 rounded-xl">
+                <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wide mb-2">Resumo não disponível</p>
+                <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground mb-2">
+                  <span>{studyInfo.icon} {studyInfo.label}</span>
+                  {article.journal && article.journal !== "Periódico não informado" && <span>· {article.journal}</span>}
+                  {article.year && <span>· {article.year}</span>}
+                  {article.citations > 0 && <span>· {article.citations.toLocaleString()} citações</span>}
+                </div>
+                {article.evidence_reason && (
+                  <p className="text-xs text-foreground/60 leading-relaxed mt-1">{article.evidence_reason}</p>
+                )}
                 {(article.url || article.doi) && (
                   <a
                     href={article.url || `https://doi.org/${article.doi}`}
@@ -872,6 +932,8 @@ const ResultsView = ({
   onBack,
   synthesisLoading = false,
   synthesisFailed = false,
+  theme,
+  onToggleTheme,
 }: ResultsViewProps) => {
   const queryIntention = useQueryIntention(query);
   const [activeTab, setActiveTab] = useState("search");
@@ -1000,6 +1062,15 @@ const ResultsView = ({
           >
             Planos
           </button>
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+              className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-primary hover:border-primary/30 transition-colors"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1327,6 +1398,7 @@ const ResultsView = ({
                     summaries?.[doiKey] ||
                     summaries?.[`n/a-${artIdx + 1}`]
                   }
+                  query={query}
                 />
                 );
               })}
