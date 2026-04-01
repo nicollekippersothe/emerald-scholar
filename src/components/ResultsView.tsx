@@ -166,9 +166,13 @@ function queryRelevanceScore(article: Article, query: string): number {
 
 /* ── Language detection ── */
 const PT_ES_SOURCES_SET = new Set(["SciELO", "BVS/LILACS"]);
+const PT_JOURNAL_PATTERN = /\b(revista|jornal|braz|brasil|brasilei|latino|latin[ao]|hispano|saúde|saude|enferm|odontol|ciência|ciencia|pesquisa)\b/i;
 const getArticleLang = (a: Article): "pt" | "en" | "es" => {
   if (a.language) return a.language;
   if (PT_ES_SOURCES_SET.has(a.source)) return "pt";
+  // Detecta periódicos e títulos com termos típicos de publicações brasileiras/latinas
+  const text = (a.journal || "") + " " + (a.title || "");
+  if (PT_JOURNAL_PATTERN.test(text)) return "pt";
   return "en";
 };
 const LANG_BADGE: Record<"pt" | "en" | "es", { flag: string; label: string; cls: string }> = {
@@ -357,6 +361,13 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
         )}
       </div>
 
+      {/* Study type description — visible below badges */}
+      {STUDY_TYPE_DESCRIPTIONS[article.study_type?.toLowerCase()?.trim()] && (
+        <p className="text-[10px] text-muted-foreground/70 mb-3 leading-relaxed pl-0.5">
+          ℹ️ {STUDY_TYPE_DESCRIPTIONS[article.study_type?.toLowerCase()?.trim()]}
+        </p>
+      )}
+
       {/* Evidence level badge (from AI article_summaries) */}
       {articleSummary?.evidence_level_badge && (
         <div className="mb-2">
@@ -370,20 +381,6 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
         </div>
       )}
 
-      {/* Síntese do artigo */}
-      {(() => {
-        const sinteseText = article.sintese || article.evidence_reason || "";
-        if (!sinteseText) return null;
-        return (
-          <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-primary/[0.07] border border-primary/15">
-            <span className="text-primary text-[13px] mt-0.5 shrink-0">💡</span>
-            <div>
-              <p className="text-[9px] font-bold text-primary/60 uppercase tracking-wide mb-0.5">Síntese</p>
-              <p className="text-xs text-foreground/80 leading-relaxed">{sinteseText}</p>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Abstract / AI Summary */}
       {(() => {
@@ -1176,11 +1173,17 @@ const ResultsView = ({
       if (sortOrder === "recentes") return parseInt(b.year) - parseInt(a.year);
       if (sortOrder === "evidencia") return b.evidence_score - a.evidence_score;
       if (sortOrder === "citacoes") return b.citations - a.citations;
-      // relevancia: PT/ES articles first, then by relevance score descending
-      const ptA = PT_ES_SOURCES_SET.has(a.source) ? 1 : 0;
-      const ptB = PT_ES_SOURCES_SET.has(b.source) ? 1 : 0;
+      // relevancia: artigos com baixo overlap vão para o final
+      const relA = query ? queryRelevanceScore(a, query) : 1;
+      const relB = query ? queryRelevanceScore(b, query) : 1;
+      const lowA = relA < 0.25 ? 1 : 0;
+      const lowB = relB < 0.25 ? 1 : 0;
+      if (lowA !== lowB) return lowA - lowB;
+      // dentro do mesmo grupo: PT/ES primeiro, depois por relevância descendente
+      const ptA = PT_ES_SOURCES_SET.has(a.source) || getArticleLang(a) === "pt" ? 1 : 0;
+      const ptB = PT_ES_SOURCES_SET.has(b.source) || getArticleLang(b) === "pt" ? 1 : 0;
       if (ptB !== ptA) return ptB - ptA;
-      return 0;
+      return relB - relA;
     });
 
 
