@@ -150,6 +150,19 @@ const ScoreDots = ({ score }: { score: number }) => (
   </div>
 );
 
+/* ── Language detection ── */
+const PT_ES_SOURCES_SET = new Set(["SciELO", "BVS/LILACS"]);
+const getArticleLang = (a: Article): "pt" | "en" | "es" => {
+  if (a.language) return a.language;
+  if (PT_ES_SOURCES_SET.has(a.source)) return "pt";
+  return "en";
+};
+const LANG_BADGE: Record<"pt" | "en" | "es", { flag: string; label: string; cls: string }> = {
+  pt: { flag: "🇧🇷", label: "PT", cls: "bg-green-500/10 text-green-400 border-green-500/20" },
+  en: { flag: "🇺🇸", label: "EN", cls: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+  es: { flag: "🇪🇸", label: "ES", cls: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
+};
+
 /* ── Evidence level badge colors ── */
 const EVIDENCE_BADGE_CONFIG: Record<string, string> = {
   "Meta-análise":                  "bg-emerald-500/15 text-emerald-300 border-emerald-400/30",
@@ -218,6 +231,15 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
           {article.is_oa && (
             <span className="text-primary text-[10px] font-bold">🔓 Acesso aberto</span>
           )}
+          {(() => {
+            const lang = getArticleLang(article);
+            const b = LANG_BADGE[lang];
+            return (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${b.cls}`}>
+                {b.flag} {b.label}
+              </span>
+            );
+          })()}
         </div>
         <button
           onClick={onSave}
@@ -299,6 +321,21 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
           </span>
         </div>
       )}
+
+      {/* Síntese do artigo */}
+      {(() => {
+        const sinteseText = article.sintese || article.evidence_reason || "";
+        if (!sinteseText) return null;
+        return (
+          <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-primary/[0.07] border border-primary/15">
+            <span className="text-primary text-[13px] mt-0.5 shrink-0">💡</span>
+            <div>
+              <p className="text-[9px] font-bold text-primary/60 uppercase tracking-wide mb-0.5">Síntese</p>
+              <p className="text-xs text-foreground/80 leading-relaxed">{sinteseText}</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Abstract / AI Summary */}
       {(() => {
@@ -981,7 +1018,7 @@ const ResultsView = ({
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [ptEsFilter, setPtEsFilter] = useState(false);
+  const [langFilter, setLangFilter] = useState<"all" | "pt" | "en">("all");
   const scrollPosRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -1035,7 +1072,6 @@ const ResultsView = ({
     });
   };
 
-  const PT_ES_SOURCES = ["SciELO", "BVS/LILACS"];
   const seenTitles = new Set<string>();
   const filteredArticles = result.articles
     .filter((a) => {
@@ -1047,7 +1083,8 @@ const ResultsView = ({
       if (sourceFilter !== "Todas" && a.source !== sourceFilter) return false;
       if (expertFilter && !a.expert_reviewed) return false;
       if (oaFilter && !a.is_oa) return false;
-      if (ptEsFilter && !PT_ES_SOURCES.includes(a.source)) return false;
+      if (langFilter === "pt" && getArticleLang(a) !== "pt") return false;
+      if (langFilter === "en" && getArticleLang(a) !== "en") return false;
       return true;
     })
     .sort((a, b) => {
@@ -1390,9 +1427,21 @@ const ResultsView = ({
               <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer">
                 <input type="checkbox" className="rounded accent-primary" checked={oaFilter} onChange={(e) => setOaFilter(e.target.checked)} /> Acesso aberto
               </label>
-              <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer">
-                <input type="checkbox" className="rounded accent-primary" checked={ptEsFilter} onChange={(e) => setPtEsFilter(e.target.checked)} /> Priorizar PT/ES
-              </label>
+              <div className="flex items-center gap-0.5 rounded-lg border border-foreground/10 p-0.5 bg-muted/30">
+                {(["all", "pt", "en"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setLangFilter(opt)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                      langFilter === opt
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {opt === "all" ? "Todos" : opt === "pt" ? "🇧🇷 PT/ES" : "🇺🇸 EN"}
+                  </button>
+                ))}
+              </div>
               <span className="text-muted-foreground">Nota mín.</span>
               <div className="flex gap-0.5">
                 {[1, 2, 3, 4, 5].map((n) => (

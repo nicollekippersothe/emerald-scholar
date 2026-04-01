@@ -45,6 +45,10 @@ export interface Article {
   url?: string;
   /** true quando o artigo veio do mockDatabase (demonstração) — não é dado real */
   isMock?: boolean;
+  /** idioma principal do artigo: 'pt' = português, 'en' = inglês, 'es' = espanhol */
+  language?: 'pt' | 'en' | 'es';
+  /** síntese curta do achado principal (1-2 frases em português) */
+  sintese?: string;
 }
 
 export interface CitedSource {
