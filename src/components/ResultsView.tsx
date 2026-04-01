@@ -493,12 +493,26 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
       })()}
 
       {/* Bias warning */}
-      {article.potential_bias && article.potential_bias !== "Nenhum identificado" && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 mb-3">
-          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-          <span>Conflito ou viés: {article.potential_bias}</span>
-        </div>
-      )}
+      {(() => {
+        const bias = article.potential_bias?.trim() || "";
+        const GENERIC_BIAS = new Set([
+          "Nenhum identificado",
+          "Verificar metodologia no artigo original",
+          "Verificar metodologia",
+          "N/A",
+          "n/a",
+          "Não identificado",
+          "Não informado",
+          "Abstract não disponível.",
+        ]);
+        const isUseful = bias.length > 10 && !GENERIC_BIAS.has(bias);
+        return isUseful ? (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 mb-3">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <span>Viés ou limitação: {bias}</span>
+          </div>
+        ) : null;
+      })()}
 
       {/* ABNT Reference */}
       <div className="mb-3">
@@ -1380,6 +1394,10 @@ const ResultsView = ({
               articles={result.articles}
               synthesisLoading={synthesisLoading}
               synthesisFailed={synthesisFailed}
+              onEnsureArticleVisible={(articleIndex) => {
+                // Expand displayed articles until the target index is in the DOM
+                setDisplayCount((prev) => Math.max(prev, articleIndex));
+              }}
             />
 
             {/* AI WARNING */}
