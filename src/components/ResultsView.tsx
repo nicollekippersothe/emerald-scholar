@@ -150,6 +150,20 @@ const ScoreDots = ({ score }: { score: number }) => (
   </div>
 );
 
+/* ── Query relevance check ── */
+function queryRelevanceScore(article: Article, query: string): number {
+  if (!query) return 1;
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
+  const queryWords = normalize(query).split(/\s+/).filter(w => w.length > 3);
+  if (queryWords.length === 0) return 1;
+  const haystack = normalize(
+    [article.title, article.abstract_pt, article.evidence_reason, article.study_type].join(" ")
+  );
+  const matches = queryWords.filter(w => haystack.includes(w));
+  return matches.length / queryWords.length;
+}
+
 /* ── Language detection ── */
 const PT_ES_SOURCES_SET = new Set(["SciELO", "BVS/LILACS"]);
 const getArticleLang = (a: Article): "pt" | "en" | "es" => {
@@ -224,6 +238,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const studyInfo = STUDY_TYPE_MAP[article.study_type] || { icon: "📄", label: article.study_type };
+  const relevanceScore = query ? queryRelevanceScore(article, query) : 1;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -268,6 +283,11 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
               </span>
             );
           })()}
+          {relevanceScore < 0.25 && query && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20" title="Pouco overlap com os termos da busca — verifique a relevância">
+              ⚠️ Relevância baixa
+            </span>
+          )}
         </div>
         <button
           onClick={onSave}
@@ -403,13 +423,28 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                 </div>
 
                 {summaryTab === "popular" && (
-                  <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
-                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <Lightbulb size={10} /> Em linguagem simples
-                    </p>
-                    <p className="text-sm text-foreground/85 leading-relaxed">
-                      {articleSummary.resumo_popular}
-                    </p>
+                  <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60 space-y-3">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <Lightbulb size={10} /> Em linguagem simples
+                      </p>
+                      <p className="text-sm text-foreground/85 leading-relaxed font-medium">
+                        {articleSummary.resumo_popular}
+                      </p>
+                    </div>
+                    {resumoPt && resumoPt.trim() !== articleSummary.resumo_popular?.trim() && (
+                      <div className="border-t border-border/40 pt-3">
+                        <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wide mb-1.5">Sobre o estudo</p>
+                        <p className={`text-xs text-foreground/70 leading-relaxed ${!expandedAbstract && resumoPt.length > 280 ? "line-clamp-3" : ""}`}>
+                          {resumoPt}
+                        </p>
+                        {resumoPt.length > 280 && (
+                          <button onClick={() => setExpandedAbstract(v => !v)} className="mt-1.5 text-[11px] text-primary font-semibold">
+                            {expandedAbstract ? "▲ Menos" : "▼ Ver mais"}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -425,12 +460,21 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                 )}
 
                 {/* Relevance to query */}
-                {query && article.evidence_reason && (
-                  <div className="bg-primary/[0.06] px-4 py-3 rounded-xl border border-primary/15">
-                    <p className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1.5">
-                      Relevância para "{query.length > 40 ? query.slice(0, 40) + "…" : query}"
+                {query && (article.evidence_reason || relevanceScore < 0.25) && (
+                  <div className={`px-4 py-3 rounded-xl border ${relevanceScore < 0.25 ? "bg-rose-500/[0.06] border-rose-500/15" : "bg-primary/[0.06] border-primary/15"}`}>
+                    <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${relevanceScore < 0.25 ? "text-rose-400/70" : "text-primary/70"}`}>
+                      {relevanceScore < 0.25
+                        ? `⚠️ Atenção: baixo overlap com "${query.length > 35 ? query.slice(0, 35) + "…" : query}"`
+                        : `Relevância para "${query.length > 40 ? query.slice(0, 40) + "…" : query}"`}
                     </p>
-                    <p className="text-xs text-foreground/70 leading-relaxed">{article.evidence_reason}</p>
+                    {article.evidence_reason && (
+                      <p className="text-xs text-foreground/70 leading-relaxed">{article.evidence_reason}</p>
+                    )}
+                    {relevanceScore < 0.25 && (
+                      <p className="text-xs text-rose-300/70 leading-relaxed mt-1">
+                        Os termos da sua busca têm pouco match no título/abstract deste artigo. Confirme se ele é pertinente ao tema antes de usar.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1132,7 +1176,11 @@ const ResultsView = ({
       if (sortOrder === "recentes") return parseInt(b.year) - parseInt(a.year);
       if (sortOrder === "evidencia") return b.evidence_score - a.evidence_score;
       if (sortOrder === "citacoes") return b.citations - a.citations;
-      return 0; // relevancia = original order
+      // relevancia: PT/ES articles first, then by relevance score descending
+      const ptA = PT_ES_SOURCES_SET.has(a.source) ? 1 : 0;
+      const ptB = PT_ES_SOURCES_SET.has(b.source) ? 1 : 0;
+      if (ptB !== ptA) return ptB - ptA;
+      return 0;
     });
 
 
