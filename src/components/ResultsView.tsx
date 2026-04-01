@@ -1419,10 +1419,10 @@ const ResultsView = ({
               synthesis={result.synthesis}
               queryType={queryIntention.mode === "consensus" ? "hypothesis" : "broad"}
               articles={result.articles}
+              filteredArticles={filteredArticles}
               synthesisLoading={synthesisLoading}
               synthesisFailed={synthesisFailed}
               onEnsureArticleVisible={(articleIndex) => {
-                // Expand displayed articles until the target index is in the DOM
                 setDisplayCount((prev) => Math.max(prev, articleIndex));
               }}
             />
@@ -1537,15 +1537,16 @@ const ResultsView = ({
 
             {/* ARTICLES */}
             <div className="space-y-4">
-              {filteredArticles.slice(0, displayCount).map((art) => {
+              {filteredArticles.slice(0, displayCount).map((art, displayIdx) => {
                 const artIdx = result.articles.indexOf(art);
-                // Chave numérica (1-based) — formato novo e confiável
+                // Chave numérica (1-based) — baseada no array original p/ lookups de resumo/IA
                 const numKey = String(artIdx + 1);
                 // Fallbacks para formatos antigos (DOI e n/a-X)
                 const doiKey = art.doi && art.doi !== "n/a" ? art.doi : `n/a-${artIdx + 1}`;
                 const summaries = result.synthesis.article_summaries;
+                // ID usa posição de exibição (displayIdx) para coincidir com Fontes Citadas
                 return (
-                  <div key={art.doi || art.title} id={`article-${artIdx + 1}`}>
+                  <div key={art.doi || art.title} id={`article-${displayIdx + 1}`}>
                     <ArticleCard
                       article={art}
                       saved={savedArticles.some((s) => s.title === art.title)}
