@@ -163,6 +163,34 @@ const LANG_BADGE: Record<"pt" | "en" | "es", { flag: string; label: string; cls:
   es: { flag: "🇪🇸", label: "ES", cls: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
 };
 
+/* ── Bias / limitation inference from metadata ── */
+const GENERIC_BIAS_SET = new Set([
+  "Nenhum identificado", "Verificar metodologia no artigo original",
+  "Verificar metodologia", "N/A", "n/a", "Não identificado", "Não informado",
+  "Abstract não disponível.",
+]);
+
+function inferBias(article: Article): { text: string; isInferred: boolean } {
+  const raw = article.potential_bias?.trim() || "";
+  if (raw.length > 10 && !GENERIC_BIAS_SET.has(raw)) {
+    return { text: raw, isInferred: false };
+  }
+  // Build inferred limitation from metadata
+  const parts: string[] = [];
+  if (!article.expert_reviewed) parts.push("não passou por revisão por pares");
+  if (article.source_quality === "baixa") parts.push("fonte de qualidade baixa");
+  else if (article.source_quality === "média") parts.push("fonte de qualidade moderada");
+  if (article.evidence_score <= 2) parts.push("delineamento observacional ou narrativo — não estabelece causalidade");
+  else if (article.evidence_score === 3) parts.push("estudo observacional: associação, não causalidade confirmada");
+  const st = article.study_type?.toLowerCase() || "";
+  if (st.includes("revisão narrativa")) parts.push("revisão narrativa sem protocolo sistemático de busca");
+  else if (st.includes("preprint") || article.source === "arXiv") parts.push("preprint sem revisão por pares — resultados preliminares");
+  else if (st.includes("opinião") || st.includes("editorial")) parts.push("opinião de especialista — baixo nível de evidência");
+  if (article.citations < 10 && article.year && Number(article.year) < 2023) parts.push("baixo número de citações para o período");
+  if (parts.length === 0) parts.push("limitações específicas não declaradas — consulte o artigo original");
+  return { text: parts.join("; "), isInferred: true };
+}
+
 /* ── Evidence level badge colors ── */
 const EVIDENCE_BADGE_CONFIG: Record<string, string> = {
   "Meta-análise":                  "bg-emerald-500/15 text-emerald-300 border-emerald-400/30",
@@ -492,26 +520,25 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
         );
       })()}
 
-      {/* Bias warning */}
+      {/* Bias / limitation */}
       {(() => {
-        const bias = article.potential_bias?.trim() || "";
-        const GENERIC_BIAS = new Set([
-          "Nenhum identificado",
-          "Verificar metodologia no artigo original",
-          "Verificar metodologia",
-          "N/A",
-          "n/a",
-          "Não identificado",
-          "Não informado",
-          "Abstract não disponível.",
-        ]);
-        const isUseful = bias.length > 10 && !GENERIC_BIAS.has(bias);
-        return isUseful ? (
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 mb-3">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            <span>Viés ou limitação: {bias}</span>
+        const { text, isInferred } = inferBias(article);
+        return (
+          <div className={`flex items-start gap-2 p-3 rounded-xl border text-xs mb-3 ${
+            isInferred
+              ? "bg-muted/40 border-border/60 text-muted-foreground"
+              : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+          }`}>
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold">
+                {isInferred ? "Limitações metodológicas" : "Viés ou limitação identificado"}
+              </span>
+              {": "}
+              <span>{text}</span>
+            </div>
           </div>
-        ) : null;
+        );
       })()}
 
       {/* ABNT Reference */}
