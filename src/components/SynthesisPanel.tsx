@@ -12,6 +12,7 @@ import {
   FlaskConical,
   Info,
   BrainCircuit,
+  ChevronDown,
 } from "lucide-react";
 import type { Synthesis, Article, CitedSource } from "@/data/mockDatabase";
 import { type QueryType } from "@/data/mockDatabase";
@@ -155,6 +156,8 @@ const SynthesisPanel = ({
   const [activeTab, setActiveTab] = useState<"distribuicao" | "detalhes" | "insights">("distribuicao");
   const [activeCite, setActiveCite] = useState<number | null>(null);
   const [showIcmInfo, setShowIcmInfo] = useState(false);
+  const [showSynthesisInfo, setShowSynthesisInfo] = useState(false);
+  const [mobileCitesOpen, setMobileCitesOpen] = useState(false);
   const sidebarRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const icmRaw = synthesis.confidence_score / 10;
@@ -356,13 +359,26 @@ const SynthesisPanel = ({
               <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
                 Síntese da Evidência
               </span>
-              <span
-                className="text-[9px] text-muted-foreground/50 cursor-help"
-                title="Resumo interpretativo gerado pela IA com base nos estudos encontrados. Não representa consenso científico definitivo — consulte os artigos originais."
+              <button
+                onClick={() => setShowSynthesisInfo(v => !v)}
+                className="text-[9px] text-muted-foreground/50 hover:text-primary/60 transition-colors flex items-center gap-0.5"
               >
-                ⓘ O que é isso?
-              </span>
+                <Info size={9} /> O que é isso?
+              </button>
             </div>
+            {showSynthesisInfo && (
+              <div className="mb-3 p-3 rounded-xl bg-primary/[0.06] border border-primary/15 text-xs text-foreground/70 leading-relaxed space-y-1.5">
+                <p className="font-semibold text-foreground/90">O que é a Síntese da Evidência?</p>
+                <p>
+                  É um resumo interpretativo gerado por IA que cruza os estudos encontrados para destacar os pontos de
+                  convergência, contradição e lacunas. Diferente de uma revisão sistemática humana, ela é produzida
+                  automaticamente — é um ponto de partida para leitura, não uma conclusão definitiva.
+                </p>
+                <p className="text-[10px] text-muted-foreground/60 pt-1 border-t border-border/40">
+                  ⚠️ Sempre consulte os artigos originais antes de citar qualquer afirmação desta síntese.
+                </p>
+              </div>
+            )}
             <p className="text-sm text-foreground leading-relaxed">
               {renderWithCitations(synthesisText, activeCite, handleCiteClick, citedSources)}
             </p>
@@ -643,15 +659,26 @@ const SynthesisPanel = ({
         </div>
 
         {/* ── Right: Cited Sources sidebar ── */}
-        <div className={`lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-border/60 bg-muted/20 px-4 py-4 ${synthesisFailed ? "hidden lg:hidden" : ""}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen size={13} className="text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Fontes Citadas
-            </span>
-          </div>
+        <div className={`lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-border/60 bg-muted/20 ${synthesisFailed ? "hidden" : ""}`}>
+          {/* Header — clicável no mobile para expandir/colapsar */}
+          <button
+            onClick={() => setMobileCitesOpen(v => !v)}
+            className="flex items-center justify-between w-full px-4 py-3 lg:py-4 lg:cursor-default"
+            aria-expanded={mobileCitesOpen}
+          >
+            <div className="flex items-center gap-2">
+              <BookOpen size={13} className="text-primary" />
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Fontes Citadas ({citedSources.length})
+              </span>
+            </div>
+            <ChevronDown
+              size={14}
+              className={`text-muted-foreground/50 transition-transform lg:hidden ${mobileCitesOpen ? "rotate-180" : ""}`}
+            />
+          </button>
 
-          <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-0.5">
+          <div className={`px-4 pb-4 space-y-2.5 max-h-[460px] overflow-y-auto pr-0.5 ${mobileCitesOpen ? "block" : "hidden"} lg:block`}>
             {citedSources.map((src) => {
               const vConf = VENUE_CONFIG[src.venue_type] ?? VENUE_CONFIG.other;
               const isActive = activeCite === src.index;

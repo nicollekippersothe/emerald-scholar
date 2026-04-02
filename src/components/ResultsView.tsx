@@ -155,13 +155,25 @@ function queryRelevanceScore(article: Article, query: string): number {
   if (!query) return 1;
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
-  const queryWords = normalize(query).split(/\s+/).filter(w => w.length > 3);
+  const queryWords = normalize(query).split(/\s+/).filter(w => w.length >= 2);
   if (queryWords.length === 0) return 1;
-  const haystack = normalize(
-    [article.title, article.abstract_pt, article.evidence_reason, article.study_type].join(" ")
+
+  const titleHaystack = normalize(article.title || "");
+  const bodyHaystack = normalize(
+    [article.abstract_pt, article.evidence_reason, article.study_type].join(" ")
   );
-  const matches = queryWords.filter(w => haystack.includes(w));
-  return matches.length / queryWords.length;
+
+  let score = 0;
+  for (const word of queryWords) {
+    // Stem: remove últimas 2 letras de palavras longas (cobre plurais/conjugações em PT)
+    const stem = word.length > 5 ? word.slice(0, word.length - 2) : word;
+    const inTitle = titleHaystack.includes(word) || (stem.length >= 4 && titleHaystack.includes(stem));
+    const inBody = bodyHaystack.includes(word) || (stem.length >= 4 && bodyHaystack.includes(stem));
+    // Match no título vale 3×, no corpo vale 1× — título é mais diagnóstico
+    score += inTitle ? 3 : inBody ? 1 : 0;
+  }
+  // Normaliza: máximo por palavra = 3 (match no título)
+  return queryWords.length > 0 ? score / (queryWords.length * 3) : 1;
 }
 
 /* ── Language detection ── */
@@ -287,7 +299,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
               </span>
             );
           })()}
-          {relevanceScore < 0.25 && query && (
+          {relevanceScore < 0.1 && query && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20" title="Pouco overlap com os termos da busca — verifique a relevância">
               ⚠️ Relevância baixa
             </span>
@@ -1101,11 +1113,13 @@ const ResultsView = ({
   const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langFilter, setLangFilter] = useState<"all" | "pt" | "en">("all");
+  const [showLowRelevance, setShowLowRelevance] = useState(false);
   const scrollPosRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     setDisplayCount(5);
     setLoadedSources(["PubMed", "OpenAlex", "Semantic Scholar"]);
+    setShowLowRelevance(false);
     scrollPosRef.current = {};
   }, [result]);
 
@@ -1154,6 +1168,10 @@ const ResultsView = ({
     });
   };
 
+  // Detecta se a query está em português (diacríticos ou palavras comuns PT)
+  const isPtQuery = /[àáâãäçèéêëíïóôõöúü]/i.test(query) ||
+    /\b(são|não|com|para|como|que|dos|das|uma|sobre|por|mais|quando|onde|quais|qual|também|saúde|tratamento|efeito|estudo|pesquisa|doença|pacientes|reduz|causa|aumenta|diminui|previne|melhora)\b/i.test(query);
+
   const seenTitles = new Set<string>();
   const filteredArticles = result.articles
     .filter((a) => {
@@ -1176,15 +1194,25 @@ const ResultsView = ({
       // relevancia: artigos com baixo overlap vão para o final
       const relA = query ? queryRelevanceScore(a, query) : 1;
       const relB = query ? queryRelevanceScore(b, query) : 1;
-      const lowA = relA < 0.25 ? 1 : 0;
-      const lowB = relB < 0.25 ? 1 : 0;
+      const lowA = relA < 0.15 ? 1 : 0;
+      const lowB = relB < 0.15 ? 1 : 0;
       if (lowA !== lowB) return lowA - lowB;
-      // dentro do mesmo grupo: PT/ES primeiro, depois por relevância descendente
-      const ptA = PT_ES_SOURCES_SET.has(a.source) || getArticleLang(a) === "pt" ? 1 : 0;
-      const ptB = PT_ES_SOURCES_SET.has(b.source) || getArticleLang(b) === "pt" ? 1 : 0;
-      if (ptB !== ptA) return ptB - ptA;
-      return relB - relA;
+      // Boost automático de artigos PT quando query está em português
+      const ptBoost = 0.12;
+      const effectiveRelA = relA + (isPtQuery && (PT_ES_SOURCES_SET.has(a.source) || getArticleLang(a) === "pt") ? ptBoost : 0);
+      const effectiveRelB = relB + (isPtQuery && (PT_ES_SOURCES_SET.has(b.source) || getArticleLang(b) === "pt") ? ptBoost : 0);
+      return effectiveRelB - effectiveRelA;
     });
+
+  // Artigos com overlap próximo de zero ficam ocultos por padrão
+  const LOW_HIDE_THRESHOLD = 0.02;
+  const articlesToShow = (sortOrder === "relevancia" && query && !showLowRelevance)
+    ? filteredArticles.filter(a => queryRelevanceScore(a, query) >= LOW_HIDE_THRESHOLD)
+    : filteredArticles;
+  const hiddenLowArticles = (sortOrder === "relevancia" && query)
+    ? filteredArticles.filter(a => queryRelevanceScore(a, query) < LOW_HIDE_THRESHOLD)
+    : [];
+  const hiddenLowCount = hiddenLowArticles.length;
 
 
   return (
@@ -1515,7 +1543,12 @@ const ResultsView = ({
             {/* FILTERS */}
             <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
               <span className="text-muted-foreground font-semibold">
-                {filteredArticles.length} artigos
+                {articlesToShow.length} artigo{articlesToShow.length !== 1 ? "s" : ""}
+                {hiddenLowCount > 0 && !showLowRelevance && (
+                  <span className="text-[10px] font-normal ml-1 text-muted-foreground/50">
+                    (+{hiddenLowCount} baixo overlap)
+                  </span>
+                )}
               </span>
               <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer">
                 <input type="checkbox" className="rounded accent-primary" checked={expertFilter} onChange={(e) => setExpertFilter(e.target.checked)} /> Avaliados por especialistas
@@ -1588,7 +1621,7 @@ const ResultsView = ({
 
             {/* ARTICLES */}
             <div className="space-y-4">
-              {filteredArticles.slice(0, displayCount).map((art, displayIdx) => {
+              {articlesToShow.slice(0, displayCount).map((art, displayIdx) => {
                 const artIdx = result.articles.indexOf(art);
                 // Chave numérica (1-based) — baseada no array original p/ lookups de resumo/IA
                 const numKey = String(artIdx + 1);
@@ -1619,29 +1652,86 @@ const ResultsView = ({
               })}
             </div>
 
+            {/* ARTIGOS DE BAIXO OVERLAP — ocultos por padrão */}
+            {hiddenLowCount > 0 && !showLowRelevance && (
+              <button
+                onClick={() => setShowLowRelevance(true)}
+                className="w-full mt-2 py-2.5 rounded-xl border border-dashed border-foreground/10 text-xs text-muted-foreground hover:border-primary/20 hover:text-foreground/70 transition-colors flex items-center justify-center gap-2"
+              >
+                <ChevronDown size={13} />
+                Ver {hiddenLowCount} artigo{hiddenLowCount !== 1 ? "s" : ""} com baixo overlap com a busca
+              </button>
+            )}
+            {hiddenLowCount > 0 && showLowRelevance && (
+              <>
+                <div className="mt-4 mb-2 flex items-center gap-2">
+                  <div className="flex-1 h-px bg-border/60" />
+                  <span className="text-[10px] text-muted-foreground/50 font-semibold uppercase tracking-wider whitespace-nowrap">
+                    Menor relevância para esta busca
+                  </span>
+                  <div className="flex-1 h-px bg-border/60" />
+                </div>
+                <div className="space-y-4 opacity-70">
+                  {hiddenLowArticles.map((art, displayIdx) => {
+                    const artIdx = result.articles.indexOf(art);
+                    const numKey = String(artIdx + 1);
+                    const doiKey = art.doi && art.doi !== "n/a" ? art.doi : `n/a-${artIdx + 1}`;
+                    const summaries = result.synthesis.article_summaries;
+                    return (
+                      <div key={art.doi || art.title} id={`article-hidden-${displayIdx + 1}`}>
+                        <ArticleCard
+                          article={art}
+                          saved={savedArticles.some((s) => s.title === art.title)}
+                          onSave={() => toggleSave(art)}
+                          resumoPt={
+                            result.synthesis.resumos_pt?.[numKey] ||
+                            result.synthesis.resumos_pt?.[art.doi] ||
+                            result.synthesis.resumos_pt?.[`n/a-${artIdx + 1}`]
+                          }
+                          articleSummary={
+                            summaries?.[numKey] ||
+                            summaries?.[doiKey] ||
+                            summaries?.[`n/a-${artIdx + 1}`]
+                          }
+                          query={query}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setShowLowRelevance(false)}
+                  className="w-full mt-2 py-2.5 rounded-xl border border-dashed border-foreground/10 text-xs text-muted-foreground hover:border-primary/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ChevronUp size={13} />
+                  Ocultar artigos de baixo overlap
+                </button>
+              </>
+            )}
+
             {/* LOAD MORE */}
             <div className="mt-8 flex flex-col items-center gap-3">
-              {displayCount < filteredArticles.length ? (
+              {displayCount < articlesToShow.length ? (
                 <button
                   onClick={() => {
                     if (loadMoreLoading) return;
                     setLoadMoreLoading(true);
                     setTimeout(() => {
                       setLoadMoreLoading(false);
-                      setDisplayCount((prev) => Math.min(prev + 5, filteredArticles.length));
+                      setDisplayCount((prev) => Math.min(prev + 5, articlesToShow.length));
                     }, 1200);
                   }}
                   className="bg-card/60 border border-foreground/10 hover:border-primary/30 px-8 py-3 rounded-2xl text-sm font-semibold text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2"
                 >
                   {loadMoreLoading
                     ? <><Loader2 size={16} className="animate-spin" /> Buscando mais artigos...</>
-                    : <><Search size={16} /> Carregar mais {Math.min(5, filteredArticles.length - displayCount)} artigos</>
+                    : <><Search size={16} /> Carregar mais {Math.min(5, articlesToShow.length - displayCount)} artigos</>
                   }
                 </button>
               ) : (
                 <div className="text-center space-y-1">
                   <p className="text-xs text-emerald-500 font-semibold">
-                    ✓ Você está vendo todos os {filteredArticles.length} artigos analisados nesta busca.
+                    ✓ {articlesToShow.length} artigo{articlesToShow.length !== 1 ? "s" : ""} exibido{articlesToShow.length !== 1 ? "s" : ""}{hiddenLowCount > 0 && !showLowRelevance ? ` · ${hiddenLowCount} ocultado${hiddenLowCount !== 1 ? "s" : ""} por baixo overlap` : ""}.
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     Para resultados de buscas diferentes, use a barra de pesquisa acima.
