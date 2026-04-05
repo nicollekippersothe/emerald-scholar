@@ -329,6 +329,114 @@ async function fetchEuropePMC(query: string): Promise<Article[]> {
     });
 }
 
+// ─── PubMed (NCBI Entrez) ─────────────────────────────────────────────────────
+
+async function fetchPubMed(query: string): Promise<Article[]> {
+  const ncbiKey = process.env.NCBI_API_KEY ?? "";
+  const keyParam = ncbiKey ? `&api_key=${ncbiKey}` : "";
+
+  // Step 1: search IDs
+  const searchUrl =
+    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` +
+    `?db=pubmed&term=${encodeURIComponent(query)}&retmax=15&retmode=json${keyParam}`;
+
+  const searchRes = await fetch(searchUrl, {
+    headers: { "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!searchRes.ok) throw new Error(`PubMed search ${searchRes.status}`);
+
+  const searchData = (await searchRes.json()) as { esearchresult: { idlist: string[] } };
+  const ids = searchData.esearchresult?.idlist ?? [];
+  if (ids.length === 0) return [];
+
+  // Step 2: fetch summaries
+  const summaryUrl =
+    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi` +
+    `?db=pubmed&id=${ids.join(",")}&retmode=json${keyParam}`;
+
+  const summaryRes = await fetch(summaryUrl, {
+    headers: { "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!summaryRes.ok) throw new Error(`PubMed summary ${summaryRes.status}`);
+
+  const summaryData = (await summaryRes.json()) as { result: Record<string, any> };
+  const result = summaryData.result ?? {};
+
+  return ids
+    .map((id) => {
+      const item = result[id];
+      if (!item || !item.title) return null;
+      const authors = (item.authors ?? [])
+        .slice(0, 3)
+        .map((a: any) => a.name ?? "")
+        .filter(Boolean)
+        .join(", ");
+      const year = item.pubdate ? parseInt(item.pubdate.slice(0, 4)) : null;
+      const doi = (item.elocationid ?? "").replace("doi: ", "").trim();
+      const pubTypes: string = (item.pubtype ?? []).join(" ").toLowerCase();
+      const studyType = studyTypeFromLabel(pubTypes || item.fulljournalname || "");
+      return buildArticle({
+        title: item.title,
+        authors: authors || "Autores não disponíveis",
+        year,
+        journal: item.fulljournalname ?? item.source ?? "Periódico não informado",
+        source: "PubMed",
+        citations: 0,
+        is_oa: false,
+        doi,
+        abstract: "",
+        studyType,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
+      });
+    })
+    .filter((a): a is Article => a !== null);
+}
+
+// ─── DOAJ ─────────────────────────────────────────────────────────────────────
+
+async function fetchDOAJ(query: string): Promise<Article[]> {
+  const url =
+    `https://doaj.org/api/search/articles/${encodeURIComponent(query)}` +
+    `?pageSize=12&page=1`;
+
+  const res = await fetch(url, {
+    headers: { "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`DOAJ ${res.status}`);
+
+  const data = (await res.json()) as { results: any[] };
+  return (data.results ?? [])
+    .filter((r) => r.bibjson?.title)
+    .map((r) => {
+      const bib = r.bibjson ?? {};
+      const title = Array.isArray(bib.title) ? bib.title[0] : bib.title;
+      const authors = (bib.author ?? [])
+        .slice(0, 3)
+        .map((a: any) => `${a.name ?? ""}`.trim())
+        .filter(Boolean)
+        .join(", ");
+      const year = bib.year ? parseInt(bib.year) : null;
+      const journal = bib.journal?.title ?? "DOAJ";
+      const doi = (bib.identifier ?? []).find((i: any) => i.type === "doi")?.id ?? "";
+      return buildArticle({
+        title,
+        authors: authors || "Autores não disponíveis",
+        year,
+        journal,
+        source: "DOAJ",
+        citations: 0,
+        is_oa: true,
+        doi,
+        abstract: (bib.abstract ?? ""),
+        studyType: "estudo observacional",
+        url: doi ? `https://doi.org/${doi}` : undefined,
+      });
+    });
+}
+
 // ─── Semantic Scholar ─────────────────────────────────────────────────────────
 
 async function fetchSemanticScholar(query: string): Promise<Article[]> {
@@ -417,6 +525,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchCrossRef(finalQuery),
     fetchEuropePMC(finalQuery),
     fetchSemanticScholar(finalQuery),
+    fetchPubMed(finalQuery),
+    fetchDOAJ(finalQuery),
   ]);
 
   const articles: Article[] = [];

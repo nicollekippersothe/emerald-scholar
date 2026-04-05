@@ -538,7 +538,7 @@ const SynthesisPanel = ({
                   </div>
                 );
               })()}
-              {synthesis.inconclusive_summary && (
+              {synthesis.inconclusive_summary && (synthesis.consensus_inconclusive + synthesis.consensus_contradict) > 25 && (
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 block">
                     Pontos em debate

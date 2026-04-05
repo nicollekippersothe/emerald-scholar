@@ -888,7 +888,9 @@ const AnalysisTab = ({ result }: { result: MockEntry }) => (
 
     <div className="bg-card/40 border border-foreground/5 rounded-2xl p-5">
       <h4 className="font-semibold text-foreground text-sm mb-3">Pontos inconclusivos</h4>
-      <p className="text-sm text-foreground/70 leading-relaxed mb-4">{result.synthesis.inconclusive_summary}</p>
+      {(result.synthesis.consensus_inconclusive + result.synthesis.consensus_contradict) > 25 && (
+        <p className="text-sm text-foreground/70 leading-relaxed mb-4">{result.synthesis.inconclusive_summary}</p>
+      )}
       {result.synthesis.contradict_explanation && (
         <>
           <h4 className="font-semibold text-foreground text-sm mb-2">Por que alguns estudos contradizem?</h4>
