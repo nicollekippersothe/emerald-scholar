@@ -616,6 +616,110 @@ async function fetchSemanticScholar(query: string): Promise<Article[]> {
     });
 }
 
+// ─── Psychology detection ─────────────────────────────────────────────────────
+
+const PSYCH_TERMS = /\b(psicolog|psiquiatr|psicoterapia|terapia cognitiv|terapia comportament|saúde mental|transtorno|depressão|ansiedade|bipolar|esquizofrenia|tdah|autismo|burnout|trauma|ptsd|estresse|cogniç|emoç|comportamento|neurodesenvolvimento|psicoanális|freud|jung|psicanál|personalidade|aprendizagem|memoria|cognitiv|neurocognitiv|psicopatolog|intervention psycholog|mental health|anxiety disorder|depression disorder|cognitive behavior|psychotherapy|psychiatry|psychology|psychological|neuropsycholog|developmental disorder|autism spectrum|attention deficit)\b/i;
+
+function isPsychQuery(q: string): boolean {
+  return PSYCH_TERMS.test(q);
+}
+
+// ─── Semantic Scholar — Psychology field filter ───────────────────────────────
+
+async function fetchSemanticScholarPsych(query: string): Promise<Article[]> {
+  const apiKey = process.env.S2_API_KEY;
+  const headers: Record<string, string> = { "User-Agent": "ScholarIA/1.0" };
+  if (apiKey) headers["x-api-key"] = apiKey;
+
+  const fields = "title,authors,year,abstract,citationCount,isOpenAccess,externalIds,publicationTypes";
+  const url =
+    `https://api.semanticscholar.org/graph/v1/paper/search` +
+    `?query=${encodeURIComponent(query)}&limit=12&fields=${fields}` +
+    `&fieldsOfStudy=Psychology`;
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`SemanticScholarPsych ${res.status}`);
+  const data = (await res.json()) as { data: any[] };
+  return (data.data ?? [])
+    .filter((p) => p.title)
+    .map((p) => {
+      const doi = p.externalIds?.DOI ?? "";
+      const authors = truncateAuthors(
+        (p.authors ?? []).map((a: any) => a.name).filter(Boolean).join(", ")
+      );
+      const types = (p.publicationTypes ?? []).join(" ").toLowerCase();
+      return buildArticle({
+        title: p.title,
+        authors,
+        year: p.year ?? null,
+        journal: "Semantic Scholar",
+        source: "Semantic Scholar",
+        citations: p.citationCount ?? 0,
+        is_oa: p.isOpenAccess ?? false,
+        doi,
+        abstract: p.abstract ?? "",
+        studyType: studyTypeFromLabel(types),
+        url: doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${p.paperId}`,
+      });
+    });
+}
+
+// ─── OpenAlex — Psychology concept (C15744967) ────────────────────────────────
+
+async function fetchOpenAlexPsych(query: string): Promise<Article[]> {
+  // C15744967 = Psychology concept in OpenAlex
+  const url =
+    `https://api.openalex.org/works` +
+    `?search=${encodeURIComponent(query)}` +
+    `&filter=concepts.id:C15744967` +
+    `&per-page=15&select=${OA_FIELDS}` +
+    `&mailto=${MAILTO}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(9000),
+  });
+  if (!res.ok) throw new Error(`OpenAlexPsych ${res.status}`);
+  const data = (await res.json()) as { results: any[] };
+  return (data.results ?? []).filter((w) => w.title).map(mapOpenAlexWork);
+}
+
+// ─── PsyArXiv (OSF preprints — psychology) ───────────────────────────────────
+
+async function fetchPsyArXiv(query: string): Promise<Article[]> {
+  const url =
+    `https://api.osf.io/v2/preprints/` +
+    `?filter[provider]=psyarxiv` +
+    `&filter[title]=${encodeURIComponent(query)}` +
+    `&page[size]=8`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "ScholarIA/1.0", "Accept": "application/json" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`PsyArXiv ${res.status}`);
+  const data = (await res.json()) as { data: any[] };
+  return (data.data ?? [])
+    .filter((p) => p.attributes?.title)
+    .map((p) => {
+      const attr = p.attributes ?? {};
+      const doi = attr.doi ?? "";
+      const year = attr.date_published
+        ? parseInt(attr.date_published.slice(0, 4))
+        : null;
+      return buildArticle({
+        title: attr.title,
+        authors: "Autores não disponíveis",
+        year,
+        journal: "PsyArXiv",
+        source: "arXiv",
+        citations: 0,
+        is_oa: true,
+        doi,
+        abstract: attr.description ?? "",
+        studyType: "preprint",
+        url: doi ? `https://doi.org/${doi}` : `https://psyarxiv.com/${p.id}/`,
+      });
+    });
+}
+
 // ─── Deduplication ────────────────────────────────────────────────────────────
 
 function normTitle(t: string): string {
@@ -649,6 +753,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!q?.trim()) return res.status(400).json({ error: "query obrigatória" });
 
   // Expand PT query → EN keywords for broader EN-language coverage
+  console.log(`[api/search] query="${q}" lang="${lang}" psych=${isPsychQuery(q)}`);
   const expandedQuery = await expandQueryToEnglish(q);
   const langHint =
     lang.includes("pt") || lang.includes("es")
@@ -660,19 +765,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     /[àáâãäçèéêëíïóôõöúü]/i.test(q) ||
     /\b(são|não|com|para|como|que|dos|das|uma|sobre|por|mais|saúde|tratamento|efeito|estudo|pesquisa|doença|pacientes)\b/i.test(q);
 
+  const isPsych = isPsychQuery(q);
+
   // Run all sources in parallel:
   // - EN sources use the expanded query for broader coverage
   // - PT sources use the original query + language filter for precision
+  // - Psychology queries get extra psych-specific sources
   const results = await Promise.allSettled([
     fetchOpenAlex(finalQuery),
-    fetchOpenAlexPT(q),          // SciELO, BVS-LILACS, revistas BR via OpenAlex language:pt
+    fetchOpenAlexPT(q),                                        // SciELO, BVS-LILACS via OpenAlex language:pt
     fetchCrossRef(finalQuery),
     fetchEuropePMC(finalQuery),
-    fetchEuropePMCPT(q),         // EuropePMC with LANG:por OR LANG:spa
+    fetchEuropePMCPT(q),                                       // EuropePMC LANG:por OR LANG:spa
     fetchSemanticScholar(finalQuery),
     fetchPubMed(finalQuery),
-    fetchPubMedPT(q),            // PubMed with Portuguese[Language] filter
-    fetchDOAJ(q),                // DOAJ with original query for better Portuguese journal coverage
+    fetchPubMedPT(q),                                          // PubMed Portuguese[Language]
+    fetchDOAJ(q),                                              // DOAJ (cobre revistas abertas BR)
+    ...(isPsych ? [
+      fetchSemanticScholarPsych(q),                            // S2 fieldsOfStudy=Psychology
+      fetchOpenAlexPsych(q),                                   // OpenAlex concepts.id=C15744967
+      fetchPsyArXiv(q),                                        // PsyArXiv preprints
+    ] : []),
   ]);
 
   const articles: Article[] = [];
@@ -704,5 +817,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return b.citations - a.citations;
   });
 
-  return res.status(200).json({ count: unique.length, articles: unique });
+  return res.status(200).json({ count: unique.length, articles: unique, isPsych });
 }
