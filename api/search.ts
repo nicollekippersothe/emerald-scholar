@@ -63,6 +63,7 @@ interface Article {
   confidence_score: number;
   confidence_factors: object;
   url?: string;
+  language?: "pt" | "en" | "es";
 }
 
 function studyTypeFromLabel(label: string): string {
@@ -94,6 +95,7 @@ function buildArticle(p: {
   abstract: string;
   studyType: string;
   url?: string;
+  language?: "pt" | "en" | "es";
 }): Article {
   const evScore = evScoreFromStudyType(p.studyType);
   const firstAuthor = (p.authors || "AUTOR").split(",")[0].toUpperCase();
@@ -127,6 +129,7 @@ function buildArticle(p: {
       citations_weight: Math.min(100, Math.floor(p.citations / 10)),
     },
     ...(p.url ? { url: p.url } : {}),
+    ...(p.language ? { language: p.language } : {}),
   };
 }
 
@@ -231,7 +234,7 @@ async function fetchOpenAlexPT(query: string): Promise<Article[]> {
     `https://api.openalex.org/works` +
     `?search=${encodeURIComponent(query)}` +
     `&filter=language:pt` +
-    `&per-page=15&select=${OA_FIELDS}` +
+    `&per-page=20&select=${OA_FIELDS}` +
     `&mailto=${MAILTO}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "ScholarIA/1.0" },
@@ -239,7 +242,11 @@ async function fetchOpenAlexPT(query: string): Promise<Article[]> {
   });
   if (!res.ok) throw new Error(`OpenAlexPT ${res.status}`);
   const data = (await res.json()) as { results: any[] };
-  return (data.results ?? []).filter((w) => w.title).map(mapOpenAlexWork);
+  return (data.results ?? []).filter((w) => w.title).map((w) => {
+    const a = mapOpenAlexWork(w);
+    a.language = "pt";
+    return a;
+  });
 }
 
 // ─── CrossRef ─────────────────────────────────────────────────────────────────
@@ -340,7 +347,7 @@ async function fetchEuropePMCPT(query: string): Promise<Article[]> {
   const url =
     `https://www.ebi.ac.uk/europepmc/webservices/rest/search` +
     `?query=${encodeURIComponent(ptQuery)}` +
-    `&format=json&pageSize=12&resultType=core`;
+    `&format=json&pageSize=15&resultType=core`;
   const res = await fetch(url, {
     headers: { "User-Agent": "ScholarIA/1.0" },
     signal: AbortSignal.timeout(9000),
@@ -362,6 +369,7 @@ async function fetchEuropePMCPT(query: string): Promise<Article[]> {
         abstract: r.abstractText ?? "",
         studyType: studyTypeFromLabel(r.pubType ?? ""),
         url: r.doi ? `https://doi.org/${r.doi}` : undefined,
+        language: "pt",
       });
     });
 }
@@ -450,6 +458,80 @@ async function fetchPubMed(query: string): Promise<Article[]> {
         abstract: abstracts[id] ?? "",
         studyType: studyTypeFromLabel(pubTypes || item.fulljournalname || ""),
         url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
+      });
+    })
+    .filter((a): a is Article => a !== null);
+}
+
+// ─── PubMed PT (Portuguese[Language] filter) ─────────────────────────────────
+
+async function fetchPubMedPT(query: string): Promise<Article[]> {
+  const ncbiKey = process.env.NCBI_API_KEY ?? "";
+  const keyParam = ncbiKey ? `&api_key=${ncbiKey}` : "";
+  const ptQuery = `${query} AND Portuguese[Language]`;
+
+  const searchUrl =
+    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` +
+    `?db=pubmed&term=${encodeURIComponent(ptQuery)}&retmax=10&retmode=json${keyParam}`;
+  const searchRes = await fetch(searchUrl, {
+    headers: { "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!searchRes.ok) throw new Error(`PubMedPT search ${searchRes.status}`);
+  const searchData = (await searchRes.json()) as { esearchresult: { idlist: string[] } };
+  const ids = searchData.esearchresult?.idlist ?? [];
+  if (ids.length === 0) return [];
+
+  const idStr = ids.join(",");
+  const summaryUrl =
+    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi` +
+    `?db=pubmed&id=${idStr}&retmode=json${keyParam}`;
+  const fetchUrl =
+    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi` +
+    `?db=pubmed&id=${idStr}&retmode=xml${keyParam}`;
+
+  const [summaryRes, fetchRes] = await Promise.all([
+    fetch(summaryUrl, { headers: { "User-Agent": "ScholarIA/1.0" }, signal: AbortSignal.timeout(8000) }),
+    fetch(fetchUrl,   { headers: { "User-Agent": "ScholarIA/1.0" }, signal: AbortSignal.timeout(8000) }),
+  ]);
+
+  if (!summaryRes.ok) throw new Error(`PubMedPT summary ${summaryRes.status}`);
+  const summaryData = (await summaryRes.json()) as { result: Record<string, any> };
+  const summaries = summaryData.result ?? {};
+
+  const abstracts: Record<string, string> = {};
+  if (fetchRes.ok) {
+    try {
+      const xml = await fetchRes.text();
+      Object.assign(abstracts, parseXmlAbstracts(xml));
+    } catch (_) { /* non-fatal */ }
+  }
+
+  return ids
+    .map((id) => {
+      const item = summaries[id];
+      if (!item || !item.title) return null;
+      const authors = (item.authors ?? [])
+        .slice(0, 3)
+        .map((a: any) => a.name ?? "")
+        .filter(Boolean)
+        .join(", ");
+      const year = item.pubdate ? parseInt(item.pubdate.slice(0, 4)) : null;
+      const doi = (item.elocationid ?? "").replace("doi: ", "").trim();
+      const pubTypes: string = (item.pubtype ?? []).join(" ").toLowerCase();
+      return buildArticle({
+        title: item.title,
+        authors: authors || "Autores não disponíveis",
+        year,
+        journal: item.fulljournalname ?? item.source ?? "Periódico não informado",
+        source: "PubMed",
+        citations: 0,
+        is_oa: false,
+        doi,
+        abstract: abstracts[id] ?? "",
+        studyType: studyTypeFromLabel(pubTypes || item.fulljournalname || ""),
+        url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
+        language: "pt",
       });
     })
     .filter((a): a is Article => a !== null);
@@ -574,6 +656,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : "";
   const finalQuery = expandedQuery + langHint;
 
+  const isPtSearch = lang.includes("pt") || lang.includes("es") ||
+    /[àáâãäçèéêëíïóôõöúü]/i.test(q) ||
+    /\b(são|não|com|para|como|que|dos|das|uma|sobre|por|mais|saúde|tratamento|efeito|estudo|pesquisa|doença|pacientes)\b/i.test(q);
+
   // Run all sources in parallel:
   // - EN sources use the expanded query for broader coverage
   // - PT sources use the original query + language filter for precision
@@ -585,6 +671,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchEuropePMCPT(q),         // EuropePMC with LANG:por OR LANG:spa
     fetchSemanticScholar(finalQuery),
     fetchPubMed(finalQuery),
+    fetchPubMedPT(q),            // PubMed with Portuguese[Language] filter
     fetchDOAJ(q),                // DOAJ with original query for better Portuguese journal coverage
   ]);
 
@@ -604,15 +691,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Dedupe first (keeps first occurrence — sources with abstracts are pushed first)
   const unique = dedupe(articles);
 
-  // Sort: relevance to original query first, then citations as tie-break
+  // Sort: relevance to original query first, PT boost for PT queries, then citations
   const queryTerms = q
     .toLowerCase()
     .split(/[\s,?!.]+/)
     .filter((t) => t.length > 3);
 
   unique.sort((a, b) => {
-    const relA = relevanceScore(a, queryTerms);
-    const relB = relevanceScore(b, queryTerms);
+    const relA = relevanceScore(a, queryTerms) + (isPtSearch && a.language === "pt" ? 2 : 0);
+    const relB = relevanceScore(b, queryTerms) + (isPtSearch && b.language === "pt" ? 2 : 0);
     if (relB !== relA) return relB - relA;
     return b.citations - a.citations;
   });
