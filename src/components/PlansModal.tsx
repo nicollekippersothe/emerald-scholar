@@ -1,32 +1,59 @@
 import { useState } from "react";
-import { X, CheckCircle2, Copy, Check } from "lucide-react";
+import { X, CheckCircle2, Loader2 } from "lucide-react";
 
 type Plan = {
+  id: string;
   name: string;
   price: string;
   period: string;
   features: string[];
   cta: string;
   disabled: boolean;
-  code: string;
   highlight?: boolean;
-  contactLink?: string;
 };
 
 const PLANS: Plan[] = [
-  { name: "Gratuito", price: "R$ 0", period: "/mês", features: ["3 buscas/dia", "Resumo básico", "Referência ABNT", "11 bases simultâneas", "Salvar artigos"], cta: "Plano atual", disabled: true, code: "" },
-  { name: "Estudante", price: "R$ 6,00", period: "/mês", features: ["30 buscas/dia", "Consenso completo", "Referência ABNT", "11 bases simultâneas", "Análise de consenso", "Índice de confiabilidade", "Salvar artigos"], cta: "Assinar Estudante", disabled: false, code: "SCHOLAR-EST-2024", highlight: false },
-  { name: "Pesquisador", price: "R$ 26,00", period: "/mês", features: ["Buscas ilimitadas", "Todas as análises", "Referência ABNT", "11 bases + arXiv preprints", "Análise de consenso avançada", "Índice de confiabilidade", "Salvar artigos ilimitados", "Acesso antecipado a novos recursos"], cta: "Assinar Pesquisador", disabled: false, code: "SCHOLAR-PRO-2024", highlight: true },
+  { id: "free",        name: "Gratuito",    price: "R$ 0",     period: "/mês", features: ["3 buscas/dia", "Resumo básico", "Referência ABNT", "13 bases simultâneas", "Salvar artigos"], cta: "Plano atual", disabled: true },
+  { id: "estudante",   name: "Estudante",   price: "R$ 6,00",  period: "/mês", features: ["30 buscas/dia", "Consenso completo", "Referência ABNT", "13 bases simultâneas", "Análise de consenso", "Índice de confiabilidade", "Salvar artigos"], cta: "Assinar Estudante", disabled: false },
+  { id: "pesquisador", name: "Pesquisador", price: "R$ 26,00", period: "/mês", features: ["Buscas ilimitadas", "Todas as análises", "Referência ABNT", "13 bases + arXiv preprints", "Análise de consenso avançada", "Índice de confiabilidade", "Salvar artigos ilimitados", "Acesso antecipado a novos recursos"], cta: "Assinar Pesquisador", disabled: false, highlight: true },
 ];
 
-const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
-  const [copiedCode, setCopiedCode] = useState("");
+const PlansModal = ({
+  open,
+  onClose,
+  userId,
+  userEmail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  userId?: string;
+  userEmail?: string;
+}) => {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   if (!open) return null;
 
-  const copyCode = (code: string) => {
-    navigator.clipboard?.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(""), 2000);
+  const handleCheckout = async (planId: string) => {
+    setCheckoutError(null);
+    setLoadingPlan(planId);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planId, userId, email: userEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCheckoutError(data.error ?? "Erro ao iniciar pagamento.");
+        setLoadingPlan(null);
+        return;
+      }
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch {
+      setCheckoutError("Não foi possível conectar ao servidor de pagamentos.");
+      setLoadingPlan(null);
+    }
   };
 
   return (
@@ -41,10 +68,17 @@ const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) =
             <X size={20} className="text-muted-foreground" />
           </button>
         </div>
+
+        {checkoutError && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400">
+            {checkoutError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => (
             <div
-              key={plan.name}
+              key={plan.id}
               className={`rounded-2xl p-5 border ${
                 plan.highlight
                   ? "border-primary bg-primary/5 ring-1 ring-primary/20"
@@ -69,41 +103,27 @@ const PlansModal = ({ open, onClose }: { open: boolean; onClose: () => void }) =
                   </li>
                 ))}
               </ul>
-              {plan.code && (
-                <div className="mb-3 p-2 bg-foreground/[0.03] rounded-lg border border-foreground/5">
-                  <span className="text-[10px] text-muted-foreground block mb-1">Código promocional:</span>
-                  <div className="flex items-center gap-1.5">
-                    <code className="text-xs font-mono text-primary font-bold">{plan.code}</code>
-                    <button onClick={() => copyCode(plan.code)} className="text-muted-foreground hover:text-primary transition-colors">
-                      {copiedCode === plan.code ? <Check size={12} /> : <Copy size={12} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {plan.contactLink ? (
-                <a
-                  href={plan.contactLink}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold transition-all bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98] block text-center"
-                >
-                  {plan.cta}
-                </a>
-              ) : (
-                <button
-                  disabled={plan.disabled}
-                  className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
-                    plan.disabled
-                      ? "bg-foreground/5 text-muted-foreground cursor-not-allowed"
-                      : plan.highlight
-                      ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.98]"
-                      : "bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98]"
-                  }`}
-                >
-                  {plan.cta}
-                </button>
-              )}
+              <button
+                disabled={plan.disabled || loadingPlan === plan.id}
+                onClick={() => !plan.disabled && handleCheckout(plan.id)}
+                className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  plan.disabled
+                    ? "bg-foreground/5 text-muted-foreground cursor-not-allowed"
+                    : plan.highlight
+                    ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.98]"
+                    : "bg-foreground/10 text-foreground hover:bg-foreground/20 active:scale-[0.98]"
+                }`}
+              >
+                {loadingPlan === plan.id && <Loader2 size={14} className="animate-spin" />}
+                {plan.cta}
+              </button>
             </div>
           ))}
         </div>
+
+        <p className="mt-5 text-center text-[10px] text-muted-foreground/50">
+          Pagamento seguro via Stripe · Cancele a qualquer momento · LGPD compliant
+        </p>
       </div>
     </div>
   );

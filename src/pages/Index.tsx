@@ -17,12 +17,18 @@ import {
   Moon,
   Menu,
   Zap,
+  LogIn,
+  LogOut,
+  UserCircle,
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth, getLocalSearchesLeftPublic } from "@/hooks/useAuth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { type MockEntry } from "@/data/mockDatabase";
 import ResultsView from "@/components/ResultsView";
 import PlansModal from "@/components/PlansModal";
 import FeedbackModal from "@/components/FeedbackModal";
+import AuthModal from "@/components/AuthModal";
 
 const SC_BADGES = [
   { name: "PubMed", color: "#EF4444" },
@@ -54,22 +60,35 @@ const Index = () => {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<MockEntry | null>(null);
   const [loading, setLoading] = useState(false);
-  const [searchesLeft, setSearchesLeft] = useState(() => {
-    try {
-      const stored = localStorage.getItem("sl_searches_left");
-      return stored !== null ? Math.max(0, parseInt(stored, 10)) : 3;
-    } catch { return 3; }
-  });
   const [showPlans, setShowPlans] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authReason, setAuthReason] = useState<"searches_exhausted" | "default">("default");
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  const { user, signOut, decrementSearch } = useAuth();
+
+  // searchesLeft: use Supabase user when available, localStorage otherwise
+  const searchesLeft = user?.searchesLeft ?? getLocalSearchesLeftPublic();
+
   const handleSearch = async (searchTerm: string, options?: { lang?: string }) => {
     if (!searchTerm.trim()) return;
+
+    // Gate: check remaining searches before consuming
+    if (searchesLeft <= 0) {
+      if (isSupabaseConfigured && !user) {
+        setAuthReason("searches_exhausted");
+        setShowAuth(true);
+      } else {
+        setShowPlans(true);
+      }
+      return;
+    }
+
     setLoading(true);
     setSynthesisLoading(false);
     setSynthesisFailed(false);
@@ -148,11 +167,7 @@ const Index = () => {
       setSearchError("Não foi possível conectar à base de dados. Verifique sua conexão e tente novamente.");
     } finally {
       setSynthesisLoading(false);
-      setSearchesLeft((prev) => {
-        const next = Math.max(0, prev - 1);
-        try { localStorage.setItem("sl_searches_left", String(next)); } catch {}
-        return next;
-      });
+      await decrementSearch();
     }
   };
 
@@ -212,7 +227,11 @@ const Index = () => {
             >
               Nossas Fontes
             </Link>
-            <div className="border border-foreground/20 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold">
+            <div className={`border px-4 py-1.5 rounded-lg text-sm font-semibold ${
+              searchesLeft === 0
+                ? "border-rose-500/40 text-rose-400"
+                : "border-foreground/20 text-primary"
+            }`}>
               {searchesLeft} buscas
             </div>
             <button
@@ -221,6 +240,29 @@ const Index = () => {
             >
               Planos
             </button>
+            {/* Auth */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground border border-foreground/10 px-3 py-1.5 rounded-lg">
+                  <UserCircle size={14} className="text-primary" />
+                  {user.email.split("@")[0]}
+                </span>
+                <button
+                  onClick={() => void signOut()}
+                  title="Sair"
+                  className="border border-foreground/20 p-2 rounded-lg text-foreground/60 hover:text-rose-400 hover:border-rose-400/30 transition-colors"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : isSupabaseConfigured ? (
+              <button
+                onClick={() => { setAuthReason("default"); setShowAuth(true); }}
+                className="flex items-center gap-1.5 border border-primary/30 bg-primary/5 text-primary px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-primary/10 transition-colors"
+              >
+                <LogIn size={14} /> Entrar
+              </button>
+            ) : null}
             <button
               onClick={toggleTheme}
               aria-label={theme === "dark" ? "Modo claro" : "Modo escuro"}
@@ -272,8 +314,18 @@ const Index = () => {
         )}
       </header>
 
-      <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+      <PlansModal
+        open={showPlans}
+        onClose={() => setShowPlans(false)}
+        userId={user?.id}
+        userEmail={user?.email}
+      />
       <FeedbackModal open={showFeedback} onClose={() => setShowFeedback(false)} />
+      <AuthModal
+        open={showAuth}
+        onClose={() => setShowAuth(false)}
+        reason={authReason}
+      />
 
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
