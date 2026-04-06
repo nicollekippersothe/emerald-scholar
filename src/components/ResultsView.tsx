@@ -444,10 +444,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                     {resumoPt && resumoPt.trim() !== articleSummary.resumo_popular?.trim() && (
                       <div className="border-t border-border/40 pt-3">
                         <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wide mb-1.5">Sobre o estudo</p>
-                        <p className={`text-xs text-foreground/70 leading-relaxed ${!expandedAbstract && resumoPt.length > 280 ? "line-clamp-3" : ""}`}>
+                        <p className={`text-xs text-foreground/70 leading-relaxed ${!expandedAbstract && resumoPt.length > 520 ? "line-clamp-6" : ""}`}>
                           {resumoPt}
                         </p>
-                        {resumoPt.length > 280 && (
+                        {resumoPt.length > 520 && (
                           <button onClick={() => setExpandedAbstract(v => !v)} className="mt-1.5 text-[11px] text-primary font-semibold">
                             {expandedAbstract ? "▲ Menos" : "▼ Ver mais"}
                           </button>
@@ -494,10 +494,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                   <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2">
                     {resumoPt ? "Resumo (IA)" : article.isMock ? "Sobre este estudo" : "Abstract"}
                   </p>
-                  <p className={`text-sm text-foreground/80 leading-relaxed ${!expandedAbstract && fallbackText.length > 320 ? "line-clamp-4" : ""}`}>
+                  <p className={`text-sm text-foreground/80 leading-relaxed ${!expandedAbstract && fallbackText.length > 600 ? "line-clamp-6" : ""}`}>
                     {fallbackText}
                   </p>
-                  {fallbackText.length > 320 && (
+                  {fallbackText.length > 600 && (
                     <button
                       onClick={() => setExpandedAbstract(v => !v)}
                       className="mt-2 text-[11px] text-primary hover:text-primary/80 transition-colors font-semibold"

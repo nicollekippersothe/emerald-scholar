@@ -221,7 +221,7 @@ const SynthesisPanel = ({
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
               <BrainCircuit size={14} className="text-primary" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70">
-                {count} estudos · Motor de Evidências
+                {count} estudos · {[...new Set(articles.map((a) => a.source))].length} bases
               </span>
               {synthesisLoading && (
                 <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 animate-pulse">
@@ -311,20 +311,6 @@ const SynthesisPanel = ({
 
       {/* ── Consenso da Ciência ── */}
       <div className="px-5 pt-4 pb-2">
-        {/* Source badges */}
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {[...new Set(articles.map((a) => a.source))]
-            .slice(0, 8)
-            .map((src) => (
-              <span
-                key={src}
-                className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground border border-border"
-              >
-                {src}
-              </span>
-            ))}
-        </div>
-
         {/* Synthesis block */}
         {synthesisLoading ? (
           <div className="border-l-4 border-primary/40 bg-primary/[0.05] rounded-r-xl pl-4 pr-4 py-4 mb-4">
@@ -705,31 +691,21 @@ const SynthesisPanel = ({
                     </span>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2 mb-1.5">
-                        {src.title}
+                      {/* Compact: author + year on first line */}
+                      <p className="text-xs font-semibold text-foreground leading-snug truncate">
+                        {src.authors
+                          ? `${src.authors}${src.year ? `, ${src.year}` : ""}`
+                          : src.title}
                       </p>
 
-                      {src.authors && (
-                        <p className="text-[10px] text-muted-foreground mb-1 truncate">
-                          {src.authors}
-                          {src.year ? ` · ${src.year}` : ""}
+                      {/* Title only when active (expanded) */}
+                      {isActive && (
+                        <p className="text-[10px] text-muted-foreground/80 leading-tight mt-0.5 line-clamp-2">
+                          {src.title}
                         </p>
                       )}
 
-                      {src.doi && src.doi !== "n/a" && (
-                        <a
-                          href={`https://doi.org/${src.doi}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 mb-1.5 transition-colors"
-                        >
-                          <ExternalLink size={9} />
-                          <span className="truncate max-w-[160px]">doi:{src.doi}</span>
-                        </a>
-                      )}
-
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${vConf.cls}`}>
                           {vConf.label}
                         </span>
@@ -739,13 +715,19 @@ const SynthesisPanel = ({
                             {src.citations.toLocaleString("pt-BR")} cit.
                           </span>
                         )}
+                        {src.doi && src.doi !== "n/a" && (
+                          <a
+                            href={`https://doi.org/${src.doi}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-0.5 text-[9px] text-primary hover:text-primary/80 transition-colors"
+                          >
+                            <ExternalLink size={9} />
+                            DOI
+                          </a>
+                        )}
                       </div>
-
-                      {src.evidence_level && (
-                        <p className="text-[10px] text-muted-foreground/60 mt-1.5 leading-tight">
-                          {src.evidence_level}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
