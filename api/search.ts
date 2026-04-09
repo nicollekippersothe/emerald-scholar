@@ -85,6 +85,8 @@ function studyTypeFromLabel(label: string): string {
   if (t.includes("case report") || t.includes("case series") || t.includes("case study")) return "relato de caso";
   if (t.includes("cross-section") || t.includes("cross section") || t.includes("survey") || t.includes("transversal")) return "estudo transversal";
   if (t.includes("preprint") || t.includes("posted-content")) return "preprint";
+  // Artigo em periódico científico = publicação peer-reviewed (design desconhecido, mas validado)
+  if (t.includes("journalarticle") || t.includes("journal article") || t.includes("journal-article")) return "coorte";
   return "estudo observacional";
 }
 

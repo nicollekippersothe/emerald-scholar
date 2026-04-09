@@ -89,14 +89,17 @@ const SOURCE_SCORES: Record<string, number> = {
 function computeICM(articles: ArticleInput[]): number {
   if (articles.length === 0) return 50;
   const top = articles.slice(0, 8);
-  const total = top.reduce((sum, a) => {
+  const baseScore = top.reduce((sum, a) => {
     const ts = STUDY_SCORES[a.study_type] ?? 50;
     const ss = SOURCE_SCORES[a.source] ?? 65;
-    // Peer review implied by type
+    // Peer review implied by type (ts >= 65 = journal article ou superior)
     const peerBonus = ts >= 65 ? 10 : 0;
     return sum + ts * 0.45 + ss * 0.30 + peerBonus * 0.25;
-  }, 0);
-  return Math.min(95, Math.max(30, Math.round(total / top.length)));
+  }, 0) / top.length;
+  // Bônus de diversidade: mais bases consultadas = evidência mais ampla (max +15)
+  const uniqueSources = new Set(top.map(a => a.source)).size;
+  const diversityBonus = Math.min(15, (uniqueSources - 1) * 4);
+  return Math.min(95, Math.max(30, Math.round(baseScore + diversityBonus)));
 }
 
 function icmLabel(score: number): string {

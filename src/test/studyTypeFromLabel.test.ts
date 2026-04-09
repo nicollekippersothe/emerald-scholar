@@ -18,6 +18,8 @@ function studyTypeFromLabel(label: string): string {
   if (t.includes("case report") || t.includes("case series") || t.includes("case study")) return "relato de caso";
   if (t.includes("cross-section") || t.includes("cross section") || t.includes("survey") || t.includes("transversal")) return "estudo transversal";
   if (t.includes("preprint") || t.includes("posted-content")) return "preprint";
+  // Artigo em periódico científico = publicação peer-reviewed (design desconhecido, mas validado)
+  if (t.includes("journalarticle") || t.includes("journal article") || t.includes("journal-article")) return "coorte";
   return "estudo observacional";
 }
 
@@ -64,8 +66,11 @@ describe("studyTypeFromLabel", () => {
   it("preprint → preprint", () => expect(studyTypeFromLabel("preprint")).toBe("preprint"));
   it("posted-content → preprint", () => expect(studyTypeFromLabel("posted-content")).toBe("preprint"));
 
+  // JournalArticle (S2/OpenAlex) → coorte (peer-reviewed, design desconhecido mas validado)
+  it("journal-article → coorte", () => expect(studyTypeFromLabel("journal-article")).toBe("coorte"));
+  it("JournalArticle (S2 publicationType) → coorte", () => expect(studyTypeFromLabel("JournalArticle")).toBe("coorte"));
+  it("journal article (espaço) → coorte", () => expect(studyTypeFromLabel("journal article")).toBe("coorte"));
+
   // Fallback
-  it("journal-article (OpenAlex) → estudo observacional", () =>
-    expect(studyTypeFromLabel("journal-article")).toBe("estudo observacional"));
   it("string vazia → estudo observacional", () => expect(studyTypeFromLabel("")).toBe("estudo observacional"));
 });

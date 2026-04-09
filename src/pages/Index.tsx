@@ -120,14 +120,17 @@ const Index = () => {
       };
       const top8 = (articles as { study_type: string; source: string }[]).slice(0, 8);
       const provisionalICM = top8.length > 0
-        ? Math.min(95, Math.max(30, Math.round(
-            top8.reduce((sum, a) => {
+        ? (() => {
+            const base = top8.reduce((sum, a) => {
               const ts = STUDY_SCORES[a.study_type] ?? 50;
               const ss = SOURCE_SCORES[a.source] ?? 65;
               const pb = ts >= 65 ? 10 : 0;
               return sum + ts * 0.45 + ss * 0.30 + pb * 0.25;
-            }, 0) / top8.length
-          )))
+            }, 0) / top8.length;
+            const uniqueSources = new Set(top8.map(a => a.source)).size;
+            const diversityBonus = Math.min(15, (uniqueSources - 1) * 4);
+            return Math.min(95, Math.max(30, Math.round(base + diversityBonus)));
+          })()
         : 60;
 
       // Mostrar artigos imediatamente com síntese provisória
