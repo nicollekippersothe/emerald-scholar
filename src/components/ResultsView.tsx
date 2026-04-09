@@ -346,9 +346,12 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
           </div>
         );
       })()}
-      <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
-        {article.authors}{article.citations > 0 ? ` · ${article.citations.toLocaleString()} citações` : ""}
-      </p>
+      {(article.authors && article.authors !== "Autores não disponíveis") || article.citations > 0 ? (
+        <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
+          {article.authors && article.authors !== "Autores não disponíveis" ? article.authors : ""}
+          {article.citations > 0 ? `${article.authors && article.authors !== "Autores não disponíveis" ? " · " : ""}${article.citations.toLocaleString()} citações` : ""}
+        </p>
+      ) : null}
 
       {/* Score */}
       <div className="mb-3 space-y-2">
@@ -1101,6 +1104,34 @@ const SourceLoadingIndicator = ({ loadedSources }: { loadedSources: string[] }) 
   );
 };
 
+/* ── Real sources badge (API mode) ── */
+const RealSourcesBadge = ({ sources }: { sources: string[] }) => {
+  if (sources.length === 0) return null;
+  return (
+    <div className="bg-card/40 border border-foreground/5 rounded-2xl px-4 py-3 mb-4 flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider shrink-0">
+        Fontes consultadas
+      </span>
+      {sources.map(s => {
+        const badge = SC_BADGES.find(b => b.name === s);
+        return (
+          <span
+            key={s}
+            className="text-[9px] font-semibold px-2 py-0.5 rounded-full border"
+            style={{
+              backgroundColor: `${badge?.color || '#888'}15`,
+              color: `${badge?.color || '#888'}`,
+              borderColor: `${badge?.color || '#888'}30`,
+            }}
+          >
+            {s}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 /* ── Main ResultsView ── */
 const ResultsView = ({
   query,
@@ -1491,8 +1522,11 @@ const ResultsView = ({
 
         {activeTab === "search" && (
           <>
-            {/* ASYNC SOURCE LOADING */}
-            <SourceLoadingIndicator loadedSources={loadedSources} />
+            {/* ASYNC SOURCE LOADING — só no modo mock (sem fontes reais da API) */}
+            {realSources
+              ? <RealSourcesBadge sources={realSources} />
+              : <SourceLoadingIndicator loadedSources={loadedSources} />
+            }
 
             {/* BANNER: MODO DEMONSTRAÇÃO */}
             {result.articles.some((a) => a.isMock) && (
