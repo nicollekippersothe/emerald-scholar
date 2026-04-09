@@ -64,14 +64,26 @@ interface Article {
   confidence_factors: object;
   url?: string;
   language?: "pt" | "en" | "es";
+  /** true quando o abstract foi estimado por IA (S2 fallback ou geração Groq) */
+  abstract_generated?: boolean;
+  /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
+  tldr?: string;
 }
 
 function studyTypeFromLabel(label: string): string {
   const t = label.toLowerCase();
-  if (t.includes("meta") || t.includes("systematic")) return "meta-análise";
-  if (t.includes("review")) return "revisão sistemática";
-  if (t.includes("trial") || t.includes("clinical")) return "ensaio clínico randomizado";
-  if (t.includes("case")) return "relato de caso";
+  // Ordem: mais específico primeiro para evitar falsos positivos
+  if (t.includes("meta-analys") || t.includes("meta analys") || t.includes("metaanalys")) return "meta-análise";
+  if ((t.includes("systematic") && t.includes("review")) || t.includes("cochrane")) return "revisão sistemática";
+  if (t.includes("systematic")) return "revisão sistemática";
+  if (t.includes("narrative review") || t.includes("literature review") || t.includes("scoping review")) return "revisão narrativa";
+  if (t.includes("review")) return "revisão sistemática"; // review genérico → sistemática
+  if (t.includes("randomized") || t.includes("randomised") || t.includes(" rct") || t.includes("controlled trial")) return "ensaio clínico randomizado";
+  if (t.includes("trial") || t.includes("clinical trial")) return "ensaio clínico randomizado";
+  if (t.includes("cohort") || t.includes("coorte") || t.includes("longitudinal") || t.includes("prospective")) return "coorte";
+  if (t.includes("case-control") || t.includes("case control")) return "estudo observacional";
+  if (t.includes("case report") || t.includes("case series") || t.includes("case study")) return "relato de caso";
+  if (t.includes("cross-section") || t.includes("cross section") || t.includes("survey") || t.includes("transversal")) return "estudo transversal";
   if (t.includes("preprint") || t.includes("posted-content")) return "preprint";
   return "estudo observacional";
 }
@@ -116,16 +128,23 @@ function buildArticle(p: {
     abstract_pt: p.abstract?.trim() || "",
     evidence_reason: `${p.studyType} com ${p.citations} citações.`,
     abnt: `${firstAuthor}. ${p.title}. ${p.journal || "s.n."}, ${p.year ?? "s.d."}.`,
-    confidence_score: Math.min(
-      95,
-      40 + evScore * 8 + Math.min(20, Math.floor(p.citations / 50))
-    ),
+    confidence_score: (() => {
+      const studyW = evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 30 : 50;
+      const sourceW = 80; // domain_weight padrão para fontes da API
+      const peerW = evScore >= 3 ? 100 : 0;
+      const recencyW = p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40;
+      const citW = Math.min(100, Math.floor(p.citations / 10));
+      // Pesos espelhados do frontend: Study(30%) Domain(25%) Peer(25%) Recency(15%) Cit(5%)
+      return Math.min(95, Math.max(30, Math.round(
+        studyW * 0.30 + sourceW * 0.25 + peerW * 0.25 + recencyW * 0.15 + citW * 0.05
+      )));
+    })(),
     confidence_factors: {
       domain_weight: 80,
       peer_reviewed: evScore >= 3,
-      study_type_weight: evScore * 15,
+      study_type_weight: evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 30 : 50,
       recency_score:
-        p.year && p.year >= 2020 ? 100 : p.year && p.year >= 2015 ? 80 : 60,
+        p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40,
       citations_weight: Math.min(100, Math.floor(p.citations / 10)),
     },
     ...(p.url ? { url: p.url } : {}),
@@ -720,6 +739,247 @@ async function fetchPsyArXiv(query: string): Promise<Article[]> {
     });
 }
 
+// ─── Abstract enrichment (S2 batch → Groq fallback) ──────────────────────────
+
+/** Busca abstracts + TLDR em lote no Semantic Scholar via DOI (1 request para N artigos). */
+async function fetchS2AbstractsBatch(
+  dois: string[]
+): Promise<Record<string, { abstract?: string; tldr?: string }>> {
+  if (dois.length === 0) return {};
+  const apiKey = process.env.S2_API_KEY;
+  const headers: Record<string, string> = {
+    "User-Agent": "ScholarIA/1.0",
+    "Content-Type": "application/json",
+  };
+  if (apiKey) headers["x-api-key"] = apiKey;
+
+  try {
+    const ids = dois.map((d) => `DOI:${d}`);
+    const res = await fetch(
+      "https://api.semanticscholar.org/graph/v1/paper/batch?fields=abstract,tldr,externalIds",
+      { method: "POST", headers, body: JSON.stringify({ ids }), signal: AbortSignal.timeout(6000) }
+    );
+    if (!res.ok) return {};
+    const data = (await res.json()) as Array<{
+      abstract?: string;
+      tldr?: { text: string };
+      externalIds?: { DOI?: string };
+    } | null>;
+    const result: Record<string, { abstract?: string; tldr?: string }> = {};
+    for (let i = 0; i < data.length; i++) {
+      const entry = data[i];
+      if (entry) {
+        result[dois[i]] = {
+          abstract: entry.abstract || undefined,
+          tldr: entry.tldr?.text || undefined,
+        };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/** Busca citation counts em lote no S2 para artigos com DOI (ex: PubMed que retorna 0). */
+async function enrichCitationsFromS2(articles: Article[]): Promise<void> {
+  const zeroCited = articles.filter((a) => a.citations === 0 && a.doi);
+  if (zeroCited.length === 0) return;
+  const apiKey = process.env.S2_API_KEY;
+  const headers: Record<string, string> = {
+    "User-Agent": "ScholarIA/1.0",
+    "Content-Type": "application/json",
+  };
+  if (apiKey) headers["x-api-key"] = apiKey;
+  try {
+    const ids = zeroCited.map((a) => `DOI:${a.doi}`);
+    const res = await fetch(
+      "https://api.semanticscholar.org/graph/v1/paper/batch?fields=citationCount,externalIds",
+      { method: "POST", headers, body: JSON.stringify({ ids }), signal: AbortSignal.timeout(6000) }
+    );
+    if (!res.ok) return;
+    const data = (await res.json()) as Array<{ citationCount?: number } | null>;
+    for (let i = 0; i < data.length; i++) {
+      const entry = data[i];
+      if (entry?.citationCount && entry.citationCount > 0) {
+        zeroCited[i].citations = entry.citationCount;
+        // Atualiza também o confidence_score com a nova informação de citações
+        const citW = Math.min(100, Math.floor(entry.citationCount / 10));
+        const prev = zeroCited[i].confidence_score;
+        // Adiciona até 5 pontos (peso de citações = 5%)
+        zeroCited[i].confidence_score = Math.min(95, Math.round(prev + citW * 0.05));
+      }
+    }
+  } catch { /* non-fatal */ }
+}
+
+/** Gera um resumo em português via Groq contextualizado à busca do usuário. */
+async function generateAbstractWithGroq(article: Article, userQuery: string): Promise<string> {
+  if (!GROQ_API_KEY) return "";
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um assistente acadêmico especializado em síntese de evidências científicas. Com base nos metadados fornecidos, escreva 2-3 frases em português descrevendo o conteúdo deste artigo, destacando o que é relevante para a busca do usuário. Seja objetivo, use dados numéricos quando possível. Responda APENAS com o resumo, sem prefácio ou explicação.",
+          },
+          {
+            role: "user",
+            content: `Busca do usuário: "${userQuery}"\n\nTítulo: ${article.title}\nPeriódico: ${article.journal}\nTipo de estudo: ${article.study_type}\nAno: ${article.year}\nCitações: ${article.citations}`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 160,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as { choices: { message: { content: string } }[] };
+    return data.choices?.[0]?.message?.content?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Enriquece artigos com abstract e TLDR do Semantic Scholar:
+ * 1) S2 batch (via DOI) — abstract real + tldr para TODOS os artigos com DOI
+ *    - Se não tem abstract: usa o S2 abstract (real)
+ *    - TLDR é salvo em article.tldr independentemente (contexto extra para síntese)
+ * 2) Groq como último recurso apenas para artigos sem abstract E sem TLDR
+ * Artigos enriquecidos recebem abstract_generated: true.
+ */
+async function enrichMissingAbstracts(articles: Article[], userQuery: string): Promise<void> {
+  const withDoi = articles.filter((a) => a.doi);
+  if (withDoi.length === 0) return;
+
+  // S2 batch para todos com DOI (abstract + tldr)
+  const s2Map = await fetchS2AbstractsBatch(withDoi.map((a) => a.doi));
+
+  for (const article of withDoi) {
+    const s2 = s2Map[article.doi];
+    if (!s2) continue;
+    // Sempre salva TLDR quando disponível (contexto extra para a síntese)
+    if (s2.tldr) article.tldr = s2.tldr;
+    // Preenche abstract vazio com abstract real do S2
+    if (!article.abstract_pt.trim() && s2.abstract) {
+      article.abstract_pt = s2.abstract;
+      article.abstract_generated = true;
+    }
+  }
+
+  // Groq apenas para artigos ainda sem abstract E sem tldr (evita hallucination)
+  const stillMissing = articles
+    .filter((a) => !a.abstract_pt.trim() && !a.tldr)
+    .slice(0, 6);
+  if (stillMissing.length > 0) {
+    const generated = await Promise.allSettled(
+      stillMissing.map((a) => generateAbstractWithGroq(a, userQuery))
+    );
+    for (let i = 0; i < stillMissing.length; i++) {
+      const r = generated[i];
+      if (r.status === "fulfilled" && r.value) {
+        stillMissing[i].abstract_pt = r.value;
+        stillMissing[i].abstract_generated = true;
+      }
+    }
+  }
+}
+
+// ─── CORE ─────────────────────────────────────────────────────────────────────
+
+async function fetchCORE(query: string): Promise<Article[]> {
+  const apiKey = process.env.CORE_API_KEY;
+  if (!apiKey) return [];
+  const url =
+    `https://api.core.ac.uk/v3/search/works` +
+    `?q=${encodeURIComponent(query)}&limit=12`;
+  const res = await fetch(url, {
+    headers: { "Authorization": `Bearer ${apiKey}`, "User-Agent": "ScholarIA/1.0" },
+    signal: AbortSignal.timeout(9000),
+  });
+  if (!res.ok) throw new Error(`CORE ${res.status}`);
+  const data = (await res.json()) as { results: any[] };
+  return (data.results ?? [])
+    .filter((r) => r.title)
+    .map((r) => {
+      const doi = r.doi ?? "";
+      const authors = (r.authors ?? [])
+        .slice(0, 3)
+        .map((a: any) => a.name ?? "")
+        .filter(Boolean)
+        .join(", ");
+      return buildArticle({
+        title: r.title,
+        authors: authors || "Autores não disponíveis",
+        year: r.yearPublished ?? null,
+        journal: r.journals?.[0]?.title ?? r.publisher ?? "CORE",
+        source: "CORE",
+        citations: 0,
+        is_oa: true,
+        doi,
+        abstract: r.abstract ?? "",
+        studyType: "estudo observacional",
+        url: doi ? `https://doi.org/${doi}` : (r.downloadUrl ?? undefined),
+      });
+    });
+}
+
+// ─── Lens.org ─────────────────────────────────────────────────────────────────
+
+async function fetchLensOrg(query: string): Promise<Article[]> {
+  const apiKey = process.env.LENS_API_KEY;
+  if (!apiKey) return [];
+  const body = {
+    query: { match: { title: query } },
+    size: 12,
+    include: ["title", "authors", "year_published", "source", "references_count", "open_access", "external_ids", "abstract"],
+  };
+  const res = await fetch("https://api.lens.org/scholarly/search", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "ScholarIA/1.0",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(9000),
+  });
+  if (!res.ok) throw new Error(`Lens.org ${res.status}`);
+  const data = (await res.json()) as { data: any[] };
+  return (data.data ?? [])
+    .filter((r) => r.title)
+    .map((r) => {
+      const doi = (r.external_ids ?? []).find((e: any) => e.type === "doi")?.value ?? "";
+      const authors = (r.authors ?? [])
+        .slice(0, 3)
+        .map((a: any) => `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim())
+        .filter(Boolean)
+        .join(", ");
+      return buildArticle({
+        title: r.title,
+        authors: authors || "Autores não disponíveis",
+        year: r.year_published ?? null,
+        journal: r.source?.title ?? "Lens.org",
+        source: "Lens.org",
+        citations: r.references_count ?? 0,
+        is_oa: r.open_access?.is_oa ?? false,
+        doi,
+        abstract: r.abstract ?? "",
+        studyType: "estudo observacional",
+        url: doi ? `https://doi.org/${doi}` : undefined,
+      });
+    });
+}
+
 // ─── Deduplication ────────────────────────────────────────────────────────────
 
 function normTitle(t: string): string {
@@ -781,6 +1041,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchPubMed(finalQuery),
     fetchPubMedPT(q),                                          // PubMed Portuguese[Language]
     fetchDOAJ(q),                                              // DOAJ (cobre revistas abertas BR)
+    fetchCORE(finalQuery),                                     // CORE (open access repository)
+    fetchLensOrg(finalQuery),                                  // Lens.org scholarly search
     ...(isPsych ? [
       fetchSemanticScholarPsych(q),                            // S2 fieldsOfStudy=Psychology
       fetchOpenAlexPsych(q),                                   // OpenAlex concepts.id=C15744967
@@ -804,18 +1066,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Dedupe first (keeps first occurrence — sources with abstracts are pushed first)
   const unique = dedupe(articles);
 
-  // Sort: relevance to original query first, PT boost for PT queries, then citations
+  // Enrich articles missing abstracts: try S2 batch, then Groq contextualizado à query
+  // Enrich em paralelo: abstracts e citation counts (PubMed retorna 0 citações)
+  await Promise.all([
+    enrichMissingAbstracts(unique, q),
+    enrichCitationsFromS2(unique),
+  ]);
+
+  // Sort: relevância + boost PT (se busca PT) + confiabilidade + citações
   const queryTerms = q
     .toLowerCase()
     .split(/[\s,?!.]+/)
     .filter((t) => t.length > 3);
 
   unique.sort((a, b) => {
-    const relA = relevanceScore(a, queryTerms) + (isPtSearch && a.language === "pt" ? 2 : 0);
-    const relB = relevanceScore(b, queryTerms) + (isPtSearch && b.language === "pt" ? 2 : 0);
-    if (relB !== relA) return relB - relA;
+    const ptBoostA = isPtSearch && a.language === "pt" ? 5 : 0;
+    const ptBoostB = isPtSearch && b.language === "pt" ? 5 : 0;
+    // Confidence boost: normaliza 40-95 → 0-3 pontos adicionais
+    const confBoostA = (a.confidence_score - 40) / 18.3;
+    const confBoostB = (b.confidence_score - 40) / 18.3;
+    const scoreA = relevanceScore(a, queryTerms) + ptBoostA + confBoostA;
+    const scoreB = relevanceScore(b, queryTerms) + ptBoostB + confBoostB;
+    if (Math.abs(scoreB - scoreA) > 0.1) return scoreB - scoreA;
     return b.citations - a.citations;
   });
 
-  return res.status(200).json({ count: unique.length, articles: unique, isPsych });
+  const sources = [...new Set(unique.map((a) => a.source))];
+  return res.status(200).json({ count: unique.length, articles: unique, isPsych, sources });
 }

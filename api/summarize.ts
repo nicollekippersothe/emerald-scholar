@@ -42,6 +42,8 @@ interface ArticleInput {
   source: string;
   doi?: string;
   journal?: string;
+  /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
+  tldr?: string;
 }
 
 // ─── Prompts ─────────────────────────────────────────────────────────────────
@@ -125,7 +127,8 @@ function buildUserPrompt(query: string, articles: ArticleInput[], computedICM: n
       const rawAbstract = a.abstract_pt?.trim() ?? "";
       const hasRealAbstract = rawAbstract.length >= 60 && rawAbstract !== "Abstract não disponível.";
       const abstract = hasRealAbstract ? rawAbstract.slice(0, 400) : "[SEM ABSTRACT — não inferir achados a partir do título]";
-      return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}`;
+      const tldrLine = a.tldr ? `\nTL;DR (S2): ${a.tldr}` : "";
+      return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}${tldrLine}`;
     })
     .join("\n\n");
 

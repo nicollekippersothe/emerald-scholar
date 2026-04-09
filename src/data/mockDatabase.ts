@@ -51,6 +51,8 @@ export interface Article {
   sintese?: string;
   /** true quando o abstract foi estimado por IA (S2 fallback ou geração Groq) */
   abstract_generated?: boolean;
+  /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
+  tldr?: string;
 }
 
 export interface CitedSource {
