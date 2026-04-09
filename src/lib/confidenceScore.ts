@@ -132,13 +132,13 @@ export function calculateConfidenceScore(
   const citationsWeight = calculateCitationsWeight(citations);
 
   // Weighted calculation
-  // Study Type (30%), Domain (25%), Peer Review (20%), Recency (15%), Citations (10%)
+  // Study Type (30%), Domain (25%), Peer Review (25%), Recency (15%), Citations (5%)
   const score = Math.round(
     (studyTypeWeight * 0.3) +
     (domainWeight * 0.25) +
-    (peerReviewBonus * 0.2) +
+    (peerReviewBonus * 0.25) +
     (recencyScore * 0.15) +
-    (citationsWeight * 0.1)
+    (citationsWeight * 0.05)
   );
 
   const factors: ConfidenceFactors = {

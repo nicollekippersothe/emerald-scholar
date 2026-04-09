@@ -69,6 +69,7 @@ const Index = () => {
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [realSources, setRealSources] = useState<string[] | undefined>(undefined);
 
   const { user, signOut, decrementSearch } = useAuth();
 
@@ -103,7 +104,31 @@ const Index = () => {
 
       if (!searchRes.ok) throw new Error("API de busca indisponível");
 
-      const { count, articles } = await searchRes.json();
+      const { count, articles, sources } = await searchRes.json();
+      if (Array.isArray(sources)) setRealSources(sources);
+
+      // ICM provisório calculado localmente enquanto a síntese IA carrega
+      const STUDY_SCORES: Record<string, number> = {
+        "meta-análise": 100, "revisão sistemática": 85,
+        "ensaio clínico randomizado": 75, "coorte": 65,
+        "estudo observacional": 50, "preprint": 30, "revisão narrativa": 40,
+      };
+      const SOURCE_SCORES: Record<string, number> = {
+        "Cochrane": 95, "PubMed": 90, "Semantic Scholar": 85,
+        "OpenAlex": 80, "CrossRef": 80, "DOAJ": 75, "SciELO": 75,
+        "Europe PMC": 75, "BVS/LILACS": 70, "CORE": 70, "BASE": 65, "arXiv": 55,
+      };
+      const top8 = (articles as { study_type: string; source: string }[]).slice(0, 8);
+      const provisionalICM = top8.length > 0
+        ? Math.min(95, Math.max(30, Math.round(
+            top8.reduce((sum, a) => {
+              const ts = STUDY_SCORES[a.study_type] ?? 50;
+              const ss = SOURCE_SCORES[a.source] ?? 65;
+              const pb = ts >= 65 ? 10 : 0;
+              return sum + ts * 0.45 + ss * 0.30 + pb * 0.25;
+            }, 0) / top8.length
+          )))
+        : 60;
 
       // Mostrar artigos imediatamente com síntese provisória
       setResult({
@@ -115,8 +140,8 @@ const Index = () => {
           consensus_agree: 0,
           consensus_inconclusive: 100,
           consensus_contradict: 0,
-          confidence_level: "média",
-          confidence_score: 60,
+          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 55 ? "média" : "limitada",
+          confidence_score: provisionalICM,
           confidence_reasons: [],
           inconclusive_summary: "",
           contradict_explanation: "",
@@ -198,6 +223,7 @@ const Index = () => {
         synthesisFailed={synthesisFailed}
         theme={theme}
         onToggleTheme={toggleTheme}
+        realSources={realSources}
       />
     );
   }
@@ -329,17 +355,17 @@ const Index = () => {
 
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
-        <section className="w-full bg-gradient-to-b from-background via-background to-background/80 px-6 pt-16 pb-12 flex flex-col items-center">
-          <div className="bg-foreground/10 text-primary px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 mb-6 border border-foreground/5">
-            <BookOpen size={16} /> PARA PESQUISA ACADÊMICA
+        <section className="w-full bg-gradient-to-b from-background via-background to-background/80 px-4 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 flex flex-col items-center">
+          <div className="bg-foreground/10 text-primary px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 mb-5 sm:mb-6 border border-foreground/5">
+            <BookOpen size={14} /> PARA PESQUISA ACADÊMICA
           </div>
 
-          <h2 className="text-4xl md:text-5xl font-extrabold text-foreground mb-4 leading-tight text-center">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-3 sm:mb-4 leading-tight text-center">
             Seu assistente de <br />
             <span className="text-primary italic">pesquisa científica</span>
           </h2>
 
-          <p className="text-foreground/70 text-lg mb-10 max-w-2xl text-center">
+          <p className="text-foreground/70 text-sm sm:text-lg mb-7 sm:mb-10 max-w-2xl text-center px-1">
             Inclui publicações de PubMed, Cochrane, SciELO, arXiv e outras — filtra os artigos revisados por
             especialistas e mostra o nível de confiabilidade de cada fonte.
           </p>
@@ -347,7 +373,7 @@ const Index = () => {
           {/* SEARCH CARD */}
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-2xl bg-card/60 border border-foreground/10 rounded-2xl p-5 mb-6 shadow-2xl"
+            className="w-full max-w-2xl bg-card/60 border border-foreground/10 rounded-2xl p-3 sm:p-5 mb-5 sm:mb-6 shadow-2xl"
           >
             <div className="relative mb-3">
               <BrainCircuit className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
@@ -395,10 +421,10 @@ const Index = () => {
           {/* Info line */}
           {!loading && (
             <>
-              <div className="flex items-center gap-6 text-sm text-muted-foreground mb-8">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">
                 <span>{searchesLeft} buscas gratuitas, sem cadastro</span>
                 <button onClick={() => setShowPlans(true)} className="flex items-center gap-2 hover:text-foreground transition-colors">
-                  <BotMessageSquare size={16} /> Analisar um PDF
+                  <BotMessageSquare size={15} /> Analisar um PDF
                 </button>
               </div>
 
@@ -420,12 +446,12 @@ const Index = () => {
               </div>
 
               {/* QUICK SEARCHES */}
-              <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-3xl">
                 {QUICK_SEARCHES.map((search) => (
                   <button
                     key={search}
                     onClick={() => handleSearch(search)}
-                    className="bg-card/50 border border-foreground/10 hover:border-primary/30 px-5 py-2.5 rounded-full text-sm text-foreground/70 hover:text-foreground transition-colors"
+                    className="bg-card/50 border border-foreground/10 hover:border-primary/30 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm text-foreground/70 hover:text-foreground transition-colors text-center"
                   >
                     {search}
                   </button>

@@ -215,8 +215,8 @@ const SynthesisPanel = ({
     <div className="rounded-2xl overflow-hidden border border-border shadow-xl mb-6 bg-card">
 
       {/* ── Header ── */}
-      <div className="bg-muted/50 px-5 py-4 border-b border-border">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="bg-muted/50 px-3 sm:px-5 py-3 sm:py-4 border-b border-border">
+        <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
               <BrainCircuit size={14} className="text-primary" />
@@ -248,7 +248,7 @@ const SynthesisPanel = ({
           </div>
 
           {/* ICM widget */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="text-center">
               <button
                 onClick={() => setShowIcmInfo(v => !v)}
@@ -256,7 +256,7 @@ const SynthesisPanel = ({
                 title="O que é o ICM?"
               >
                 <div className="flex items-baseline gap-0.5">
-                  <span className={`text-3xl font-black tabular-nums ${icm.color}`}>
+                  <span className={`text-2xl sm:text-3xl font-black tabular-nums ${icm.color}`}>
                     {icmScore}
                   </span>
                   <span className="text-xs text-muted-foreground/60">/10</span>
@@ -267,7 +267,7 @@ const SynthesisPanel = ({
                 ICM · {icm.label}
               </p>
             </div>
-            <div className="w-px h-10 bg-border" />
+            <div className="w-px h-8 sm:h-10 bg-border" />
             <div
               className="text-center cursor-help"
               title={
@@ -299,7 +299,7 @@ const SynthesisPanel = ({
               O ICM vai de <strong>0 a 10</strong> e estima a qualidade metodológica do conjunto de estudos encontrados.
               Ele combina: tipo de estudo (meta-análise = peso máximo), revisão por pares, recência, número de citações e diversidade de fontes.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px]">
               <span className="text-emerald-400 font-semibold">8,5–10 · Muito forte</span><span className="text-muted-foreground">Meta-análises e revisões Cochrane robustas</span>
               <span className="text-blue-400 font-semibold">7,0–8,4 · Forte</span><span className="text-muted-foreground">Múltiplos ECRs e revisões sistemáticas</span>
               <span className="text-amber-400 font-semibold">5,0–6,9 · Moderado</span><span className="text-muted-foreground">Coortes, estudos observacionais de qualidade</span>
@@ -310,7 +310,7 @@ const SynthesisPanel = ({
       </div>
 
       {/* ── Consenso da Ciência ── */}
-      <div className="px-5 pt-4 pb-2">
+      <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
         {/* Synthesis block */}
         {synthesisLoading ? (
           <div className="border-l-4 border-primary/40 bg-primary/[0.05] rounded-r-xl pl-4 pr-4 py-4 mb-4">
@@ -381,7 +381,7 @@ const SynthesisPanel = ({
       <div className="flex flex-col lg:flex-row min-h-0 border-t border-border/60">
 
         {/* Left: tabs */}
-        <div className="flex-1 px-5 py-4 min-w-0">
+        <div className="flex-1 px-3 sm:px-5 py-3 sm:py-4 min-w-0">
           {/* Inner tabs */}
           <div className="flex gap-1 bg-muted/50 rounded-lg p-1 mb-4">
             {tabs.map((tab) => (
@@ -427,7 +427,7 @@ const SynthesisPanel = ({
               ].map((row) => (
                 <div key={row.label} className="flex items-center gap-3">
                   <span
-                    className={`text-[11px] font-semibold w-24 flex items-center gap-1.5 shrink-0 ${row.textCls}`}
+                    className={`text-[10px] sm:text-[11px] font-semibold w-16 sm:w-24 flex items-center gap-1 sm:gap-1.5 shrink-0 ${row.textCls}`}
                   >
                     {row.icon} {row.label}
                   </span>
@@ -593,7 +593,7 @@ const SynthesisPanel = ({
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
                       Perfil dos estudos encontrados
                     </span>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="bg-muted/40 rounded-lg p-2.5 border border-border/60">
                         <p className="text-[9px] uppercase tracking-wide text-muted-foreground font-bold mb-0.5">Alta evidência</p>
                         <p className="text-lg font-black text-foreground">{highEvidence}<span className="text-xs font-normal text-muted-foreground">/{articles.length}</span></p>

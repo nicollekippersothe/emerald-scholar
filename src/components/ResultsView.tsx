@@ -645,14 +645,14 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
         {/* Artigo mock → badge de demonstração */}
         {article.isMock && (
           <span
             title="Dados de demonstração — este artigo é simulado para fins de demonstração"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-help"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-help"
           >
-            <AlertTriangle size={12} /> Demonstração
+            <AlertTriangle size={11} /> Demo
           </span>
         )}
         {/* Artigos reais: Semantic Scholar como link primário */}
@@ -661,9 +661,9 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             href={article.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
           >
-            <ExternalLink size={12} /> Ver artigo
+            <ExternalLink size={11} /> <span className="hidden xs:inline">Ver </span>artigo
           </a>
         )}
         {/* DOI como link secundário quando disponível */}
@@ -672,10 +672,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             href={`https://doi.org/${article.doi}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
             title={`DOI: ${article.doi}`}
           >
-            <ExternalLink size={12} /> DOI
+            <ExternalLink size={11} /> DOI
           </a>
         )}
         {/* Fallback Google Scholar: mock ou artigo real sem url e sem doi */}
@@ -684,9 +684,9 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             href={`https://scholar.google.com/scholar?q=${encodeURIComponent(article.title)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
           >
-            <Search size={12} /> Buscar no Scholar
+            <Search size={11} /> Scholar
           </a>
         )}
         {article.is_oa && article.pdf_url && (
@@ -694,27 +694,27 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             href={article.pdf_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
           >
-            <Download size={12} /> PDF disponível
+            <Download size={11} /> PDF
           </a>
         )}
         <button
           onClick={() => { setShowAbnt(true); copyAbnt(); }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-foreground/5 text-foreground/70 border border-foreground/10 hover:border-primary/20 transition-colors"
+          className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-foreground/5 text-foreground/70 border border-foreground/10 hover:border-primary/20 transition-colors"
         >
-          {copiedAbnt ? <Check size={12} /> : <Copy size={12} />}
+          {copiedAbnt ? <Check size={11} /> : <Copy size={11} />}
           {copiedAbnt ? "Copiado!" : "ABNT"}
         </button>
         <button
           onClick={() => setShowChat(!showChat)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold border transition-colors ${
             showChat
               ? "bg-primary/10 text-primary border-primary/20"
               : "bg-foreground/5 text-foreground/70 border-foreground/10 hover:border-primary/20"
           }`}
         >
-          <MessageCircle size={12} /> Perguntar à IA
+          <MessageCircle size={11} /> <span className="hidden sm:inline">Perguntar à </span>IA
         </button>
       </div>
 
@@ -730,12 +730,12 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
           {msgs.length === 0 && (
             <div>
               <p className="text-[10px] text-muted-foreground/60 mb-2">💡 Respostas baseadas exclusivamente no resumo do artigo — não no texto completo</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1 sm:gap-1.5">
               {QUICK_QUESTIONS.map((q) => (
                 <button
                   key={q}
                   onClick={() => sendMessage(q)}
-                  className="text-[11px] px-3 py-1.5 rounded-lg border border-foreground/10 bg-card/60 text-foreground/80 hover:bg-foreground/5 transition-colors"
+                  className="text-[10px] sm:text-[11px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-foreground/10 bg-card/60 text-foreground/80 hover:bg-foreground/5 transition-colors"
                 >
                   {q}
                 </button>
@@ -749,10 +749,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
               {msgs.map((m, i) => (
                 <div
                   key={i}
-                  className={`text-xs p-3 rounded-xl leading-relaxed ${
+                  className={`text-xs p-2.5 rounded-xl leading-relaxed ${
                     m.role === "user"
-                      ? "bg-primary/10 text-foreground ml-8"
-                      : "bg-foreground/[0.03] text-foreground/80 mr-8 border border-foreground/5"
+                      ? "bg-primary/10 text-foreground ml-4 sm:ml-8"
+                      : "bg-foreground/[0.03] text-foreground/80 mr-4 sm:mr-8 border border-foreground/5"
                   }`}
                 >
                   {m.text}
@@ -775,18 +775,18 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
 
           <form
             onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
-            className="flex gap-2"
+            className="flex gap-1.5 sm:gap-2"
           >
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Pergunte algo sobre este artigo..."
-              className="flex-1 text-xs px-3 py-2 rounded-lg border border-foreground/10 bg-background/50 text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary outline-none"
+              className="flex-1 text-xs px-3 py-2 rounded-lg border border-foreground/10 bg-background/50 text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary outline-none min-w-0"
             />
             <button
               type="submit"
-              className="text-xs font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-all"
+              className="text-xs font-semibold px-3 sm:px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-all shrink-0"
             >
               Enviar
             </button>
@@ -1355,7 +1355,7 @@ const ResultsView = ({
       />
       <DevModal open={showDev} onClose={() => setShowDev(false)} onSearch={onSearch} />
 
-      <main className="max-w-4xl mx-auto px-5 py-6">
+      <main className="max-w-4xl mx-auto px-3 sm:px-5 py-4 sm:py-6">
         {/* TIPS BAR */}
         <div className="bg-card/60 border border-foreground/5 rounded-2xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div>

@@ -99,7 +99,7 @@ export const ConfidenceBadge = ({ score, factors }: ConfidenceBadgeProps) => {
             ))}
           </div>
           <div className={`text-[10px] ${textColor} opacity-60 pt-2 border-t border-current/10`}>
-            Pesos: Tipo de Estudo (30%) · Fonte (25%) · Peer-Review (20%) · Recência (15%) · Citações (10%)
+            Pesos: Tipo de Estudo (30%) · Fonte (25%) · Peer-Review (25%) · Recência (15%) · Citações (5%)
           </div>
         </div>
       )}
