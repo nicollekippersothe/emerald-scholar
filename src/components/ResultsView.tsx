@@ -34,6 +34,7 @@ import FeedbackModal from "@/components/FeedbackModal";
 import DevModal from "@/components/DevModal";
 import PromoCodeModal from "@/components/PromoCodeModal";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
+import { calculateConfidenceScore } from "@/lib/confidenceScore";
 import SynthesisPanel from "@/components/SynthesisPanel";
 import { useQueryIntention } from "@/hooks/useQueryIntention";
 import { type MockEntry, type Article, type ArticleSummary, STUDY_TYPE_MAP, EVIDENCE_LABELS, SOURCE_LIST } from "@/data/mockDatabase";
@@ -80,6 +81,8 @@ interface ResultsViewProps {
   synthesisFailed?: boolean;
   theme?: string;
   onToggleTheme?: () => void;
+  /** Fontes reais que retornaram resultados (vindo da API) */
+  realSources?: string[];
 }
 
 /* ── Hallucination-filtered chat answer ── */
@@ -318,18 +321,31 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
       </div>
 
       {/* Title */}
-      <div className="flex items-start gap-2 mb-1">
-        <h4 className="font-bold text-foreground leading-tight line-clamp-2 flex-1">{article.title}</h4>
-        <a
-          href={`https://translate.google.com/?sl=auto&tl=pt-BR&text=${encodeURIComponent(article.title)}&op=translate`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 mt-0.5 text-muted-foreground/50 hover:text-primary transition-colors"
-          title="Ver título em português"
-        >
-          <ExternalLink size={12} />
-        </a>
-      </div>
+      {(() => {
+        const displayTitle = articleSummary?.title_pt || article.title;
+        const isTranslated = !!(articleSummary?.title_pt && articleSummary.title_pt !== article.title);
+        return (
+          <div className="flex items-start gap-2 mb-1">
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-foreground leading-tight line-clamp-2">{displayTitle}</h4>
+              {isTranslated && (
+                <p className="text-[10px] text-muted-foreground/40 mt-0.5 line-clamp-1 italic">
+                  {article.title}
+                </p>
+              )}
+            </div>
+            <a
+              href={`https://translate.google.com/?sl=auto&tl=pt-BR&text=${encodeURIComponent(article.title)}&op=translate`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 mt-0.5 text-muted-foreground/50 hover:text-primary transition-colors"
+              title="Ver título original no Google Translate"
+            >
+              <ExternalLink size={12} />
+            </a>
+          </div>
+        );
+      })()}
       <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
         {article.authors}{article.citations > 0 ? ` · ${article.citations.toLocaleString()} citações` : ""}
       </p>
@@ -342,7 +358,10 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
         >
           <ScoreDots score={article.evidence_score} />
         </div>
-        <ConfidenceBadge score={article.confidence_score} factors={article.confidence_factors} />
+        {(() => {
+          const computed = calculateConfidenceScore(article.study_type, article.source, article.journal, article.year, article.citations, article.expert_reviewed);
+          return <ConfidenceBadge score={computed.score} factors={computed.factors} />;
+        })()}
       </div>
 
       {/* Why this score */}
@@ -397,9 +416,11 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
       {/* Abstract / AI Summary */}
       {(() => {
         const hasAiSummary = !!(articleSummary?.resumo_popular || articleSummary?.resumo_tecnico);
-        // Para artigos reais (não mock), abstract_pt pode estar em inglês (vindo da API Semantic Scholar).
-        // Só exibimos rawAbstract para artigos mock (que têm resumo já em português no banco local).
-        const rawAbstract = article.isMock && article.abstract_pt && article.abstract_pt !== "Abstract não disponível." ? article.abstract_pt : "";
+        // Mostra abstract_pt para: artigos mock (já em PT), artigos com abstract real (vindo da API),
+        // e artigos enriquecidos por fallback (S2 ou geração Groq, marcados com abstract_generated).
+        const rawAbstract = article.abstract_pt && article.abstract_pt !== "Abstract não disponível."
+          ? article.abstract_pt
+          : "";
         const fallbackText = resumoPt?.trim() || rawAbstract;
         const isShortAbstract = fallbackText.length < 220;
 
@@ -491,8 +512,13 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
               <div className="space-y-2.5">
                 {/* Main abstract block */}
                 <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
-                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2">
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-2">
                     {resumoPt ? "Resumo (IA)" : article.isMock ? "Sobre este estudo" : "Abstract"}
+                    {article.abstract_generated && !resumoPt && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/80 border border-amber-500/20 text-[9px] font-semibold normal-case tracking-normal">
+                        ✦ Estimado por IA
+                      </span>
+                    )}
                   </p>
                   <p className={`text-sm text-foreground/80 leading-relaxed ${!expandedAbstract && fallbackText.length > 600 ? "line-clamp-6" : ""}`}>
                     {fallbackText}
@@ -1088,6 +1114,7 @@ const ResultsView = ({
   synthesisFailed = false,
   theme,
   onToggleTheme,
+  realSources,
 }: ResultsViewProps) => {
   const queryIntention = useQueryIntention(query);
   const [activeTab, setActiveTab] = useState("search");
@@ -1109,10 +1136,12 @@ const ResultsView = ({
   const [, setPdfUnlocked] = useState(false);
   const [showPromo, setShowPromo] = useState(false);
   const [showDev, setShowDev] = useState(false);
-  const [sortOrder, setSortOrder] = useState<"relevancia" | "recentes" | "evidencia" | "citacoes">("relevancia");
+  const [sortOrder, setSortOrder] = useState<"relevancia" | "relevancia_pt" | "recentes" | "evidencia" | "citacoes">("relevancia");
   const [showFeedback, setShowFeedback] = useState(false);
   const [savedToast, setSavedToast] = useState<string | null>(null);
-  const [loadedSources, setLoadedSources] = useState<string[]>(["PubMed", "OpenAlex", "Semantic Scholar"]);
+  const [loadedSources, setLoadedSources] = useState<string[]>(() =>
+    realSources ?? ["PubMed", "OpenAlex", "Semantic Scholar"]
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langFilter, setLangFilter] = useState<"all" | "pt" | "en">("all");
   const [showLowRelevance, setShowLowRelevance] = useState(false);
@@ -1120,10 +1149,11 @@ const ResultsView = ({
 
   useEffect(() => {
     setDisplayCount(5);
-    setLoadedSources(["PubMed", "OpenAlex", "Semantic Scholar"]);
+    // Se temos fontes reais da API, usa elas; senão mantém simulação progressiva
+    setLoadedSources(realSources ?? ["PubMed", "OpenAlex", "Semantic Scholar"]);
     setShowLowRelevance(false);
     scrollPosRef.current = {};
-  }, [result]);
+  }, [result, realSources]);
 
   useEffect(() => {
     if (!savedToast) return;
@@ -1137,8 +1167,9 @@ const ResultsView = ({
     setTimeout(() => window.scrollTo({ top: scrollPosRef.current[tabId] ?? 0, behavior: "instant" as ScrollBehavior }), 0);
   };
 
-  // Simulate async source loading
+  // Simulação progressiva apenas quando não há fontes reais da API (ex: mock data)
   useEffect(() => {
+    if (realSources) return; // fontes reais já carregadas — sem simulação
     const batches = [
       { sources: ["CrossRef", "DOAJ", "SciELO"], delay: 800 },
       { sources: ["arXiv", "Europe PMC"], delay: 1600 },
@@ -1152,7 +1183,7 @@ const ResultsView = ({
       }, batch.delay)
     );
     return () => timers.forEach(clearTimeout);
-  }, [result]);
+  }, [result, realSources]);
 
   const toggleSave = (article: Article) => {
     setSavedArticles((prev) => {
@@ -1199,6 +1230,13 @@ const ResultsView = ({
       const lowA = relA < 0.15 ? 1 : 0;
       const lowB = relB < 0.15 ? 1 : 0;
       if (lowA !== lowB) return lowA - lowB;
+      if (sortOrder === "relevancia_pt") {
+        // PT primeiro: artigos em português/SciELO/BVS aparecem antes, depois por relevância
+        const isPtA = PT_ES_SOURCES_SET.has(a.source) || getArticleLang(a) === "pt" ? 1 : 0;
+        const isPtB = PT_ES_SOURCES_SET.has(b.source) || getArticleLang(b) === "pt" ? 1 : 0;
+        if (isPtA !== isPtB) return isPtB - isPtA;
+        return relB - relA;
+      }
       // Boost automático de artigos PT quando query está em português
       const ptBoost = 0.12;
       const effectiveRelA = relA + (isPtQuery && (PT_ES_SOURCES_SET.has(a.source) || getArticleLang(a) === "pt") ? ptBoost : 0);
@@ -1208,10 +1246,11 @@ const ResultsView = ({
 
   // Artigos com overlap próximo de zero ficam ocultos por padrão
   const LOW_HIDE_THRESHOLD = 0.02;
-  const articlesToShow = (sortOrder === "relevancia" && query && !showLowRelevance)
+  const isRelevanceMode = sortOrder === "relevancia" || sortOrder === "relevancia_pt";
+  const articlesToShow = (isRelevanceMode && query && !showLowRelevance)
     ? filteredArticles.filter(a => queryRelevanceScore(a, query) >= LOW_HIDE_THRESHOLD)
     : filteredArticles;
-  const hiddenLowArticles = (sortOrder === "relevancia" && query)
+  const hiddenLowArticles = (isRelevanceMode && query)
     ? filteredArticles.filter(a => queryRelevanceScore(a, query) < LOW_HIDE_THRESHOLD)
     : [];
   const hiddenLowCount = hiddenLowArticles.length;
@@ -1381,7 +1420,7 @@ const ResultsView = ({
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               aria-label={`Aba ${tab.label}`}
-              className={`flex flex-1 items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
+              className={`flex flex-1 items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-4 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
                 activeTab === tab.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1524,6 +1563,7 @@ const ResultsView = ({
               <span className="text-xs text-muted-foreground font-semibold">Ordenar:</span>
               {([
                 { id: "relevancia", label: "Relevância" },
+                { id: "relevancia_pt", label: "🇧🇷 PT primeiro" },
                 { id: "recentes", label: "Mais recentes" },
                 { id: "evidencia", label: "Maior evidência" },
                 { id: "citacoes", label: "Mais citados" },
@@ -1579,7 +1619,7 @@ const ResultsView = ({
                   <button
                     key={n}
                     onClick={() => setScoreFilter(scoreFilter === n ? 0 : n)}
-                    className={`w-7 h-7 rounded text-[11px] font-bold border transition-colors ${
+                    className={`w-9 h-9 rounded text-xs font-bold border transition-colors ${
                       scoreFilter === n
                         ? "bg-primary text-primary-foreground border-primary"
                         : "border-foreground/10 text-muted-foreground hover:border-primary/30"
@@ -1750,7 +1790,7 @@ const ResultsView = ({
 
       {/* Saved toast */}
       {savedToast && (
-        <div className="fixed bottom-24 right-6 bg-foreground text-background text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl z-50 pointer-events-none">
+        <div className="fixed bottom-20 sm:bottom-24 right-4 sm:right-6 bg-foreground text-background text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl z-50 pointer-events-none">
           {savedToast}
         </div>
       )}

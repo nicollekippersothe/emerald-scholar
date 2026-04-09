@@ -71,6 +71,8 @@ export interface ArticleSummary {
   resumo_popular: string;
   /** Ex: "Revisão Sistemática" | "Ensaio Clínico" | "Coorte" | "Preprint" */
   evidence_level_badge: string;
+  /** Título traduzido para PT-BR (opcional — presente quando título original está em outro idioma) */
+  title_pt?: string;
 }
 
 export interface Synthesis {

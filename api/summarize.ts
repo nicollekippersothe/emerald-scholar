@@ -50,8 +50,59 @@ const SYSTEM_PROMPT = `Você é um Professor Doutor especialista em síntese de 
 Regras absolutas:
 - Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON.
 - Toda síntese deve ser em Português do Brasil (PT-BR) fluído e científico.
-- Seja direto, preciso e nunca invente dados que não estejam nos abstracts fornecidos.
-- Em inline_synthesis: aponte divergências explicitamente ("Embora [N] aponte X, [M] sugere Y").`;
+- NUNCA invente achados, resultados ou conclusões que não estejam explicitamente descritos no abstract fornecido.
+- Se o abstract de um artigo for "Abstract não disponível.", "N/A" ou tiver menos de 60 caracteres: os campos resumo_popular e resumo_tecnico devem reconhecer isso explicitamente — não deduza achados a partir do título.
+- Em inline_synthesis: aponte divergências explicitamente ("Embora [N] aponte X, [M] sugere Y").
+- title_pt: traduza o título para PT-BR de forma fiel. Se já estiver em português, repita o mesmo texto.`;
+
+// ─── ICM programático (não deixar a IA adivinhar) ────────────────────────────
+
+const STUDY_SCORES: Record<string, number> = {
+  "meta-análise": 100,
+  "revisão sistemática": 85,
+  "ensaio clínico randomizado": 75,
+  "coorte": 65,
+  "estudo observacional": 50,
+  "relato de caso": 35,
+  "revisão narrativa": 40,
+  "preprint": 30,
+};
+
+const SOURCE_SCORES: Record<string, number> = {
+  "Cochrane": 95,
+  "PubMed": 90,
+  "Semantic Scholar": 85,
+  "OpenAlex": 80,
+  "CrossRef": 80,
+  "DOAJ": 75,
+  "SciELO": 75,
+  "Europe PMC": 75,
+  "BVS/LILACS": 70,
+  "CORE": 70,
+  "Lens.org": 70,
+  "BASE": 65,
+  "arXiv": 55,
+};
+
+function computeICM(articles: ArticleInput[]): number {
+  if (articles.length === 0) return 50;
+  const top = articles.slice(0, 8);
+  const total = top.reduce((sum, a) => {
+    const ts = STUDY_SCORES[a.study_type] ?? 50;
+    const ss = SOURCE_SCORES[a.source] ?? 65;
+    // Peer review implied by type
+    const peerBonus = ts >= 65 ? 10 : 0;
+    return sum + ts * 0.45 + ss * 0.30 + peerBonus * 0.25;
+  }, 0);
+  return Math.min(95, Math.max(30, Math.round(total / top.length)));
+}
+
+function icmLabel(score: number): string {
+  if (score >= 85) return "muito alta";
+  if (score >= 70) return "alta";
+  if (score >= 55) return "média";
+  return "limitada";
+}
 
 function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" | "other" {
   if (a.source === "arXiv" || a.journal?.toLowerCase().includes("arxiv")) return "preprint";
@@ -60,8 +111,8 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
   return "journal";
 }
 
-function buildUserPrompt(query: string, articles: ArticleInput[]): string {
-  const top8 = articles.slice(0, 8);
+function buildUserPrompt(query: string, articles: ArticleInput[], computedICM: number): string {
+  const top8 = articles.slice(0, 12); // variável mantida por compatibilidade com o prompt
 
   const articlesList = top8
     .map((a, i) => {
@@ -71,7 +122,9 @@ function buildUserPrompt(query: string, articles: ArticleInput[]): string {
         venueType === "conference" ? "Conferência" :
         venueType === "preprint" ? "Preprint" : "Outro";
       const venue = a.journal ? ` | ${a.journal}` : "";
-      const abstract = a.abstract_pt?.slice(0, 400) ?? "N/A";
+      const rawAbstract = a.abstract_pt?.trim() ?? "";
+      const hasRealAbstract = rawAbstract.length >= 60 && rawAbstract !== "Abstract não disponível.";
+      const abstract = hasRealAbstract ? rawAbstract.slice(0, 400) : "[SEM ABSTRACT — não inferir achados a partir do título]";
       return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}`;
     })
     .join("\n\n");
@@ -79,6 +132,8 @@ function buildUserPrompt(query: string, articles: ArticleInput[]): string {
   const isQuestion = query.includes("?");
 
   return `Query de pesquisa: "${query}"
+
+ICM pré-calculado dos artigos: ${computedICM}/100 (baseado em tipo de estudo e fonte). Use este valor como confidence_score no JSON — não calcule novamente.
 
 Artigos (priorize Periódicos peer-reviewed; sinalize Preprints com menor peso):
 ${articlesList}
@@ -98,8 +153,9 @@ Retorne APENAS este JSON sem markdown:
   "inline_synthesis": "Parágrafo único de síntese científica (5-8 frases). Sintetize o que há de COMUM. Quando houver divergência, aponte: 'Embora [N] aponte X, [M] sugere Y'. Cada afirmação com citação [N]. 100% PT-BR fluído.",
   "article_summaries": {
     "CHAVE_DO_ARTIGO": {
-      "resumo_tecnico": "Tipo de estudo, N amostral, metodologia, resultados estatísticos (p-valor, HR se disponível), conclusão. Terminologia acadêmica. 2-4 frases.",
-      "resumo_popular": "Linguagem simples. O que investigou, o que descobriu, por que importa no dia a dia. 2-3 frases.",
+      "title_pt": "Título traduzido fielmente para PT-BR. Se já estiver em português, repita igual.",
+      "resumo_tecnico": "Tipo de estudo, N amostral, metodologia, resultados estatísticos (p-valor, HR se disponível), conclusão. Terminologia acadêmica. 2-4 frases. SE o abstract indicar [SEM ABSTRACT], escreva: 'Abstract completo não disponível para este artigo.'",
+      "resumo_popular": "Linguagem simples. O que investigou, o que descobriu, por que importa. 2-3 frases. OBRIGATÓRIO: baseie-se APENAS no abstract fornecido. SE o abstract indicar [SEM ABSTRACT], escreva: 'O abstract completo deste artigo não está disponível. Não é possível descrever os achados sem acesso ao conteúdo original.'",
       "evidence_level_badge": "Uma opção: Meta-análise | Revisão Sistemática | Ensaio Clínico Randomizado | Estudo de Coorte | Estudo Transversal | Estudo Caso-Controle | Relato de Caso | Preprint não revisado | Revisão Narrativa | Estudo Observacional"
     }
   },
@@ -119,7 +175,7 @@ Retorne APENAS este JSON sem markdown:
   "resumos_pt": {"CHAVE": "Resumo 1-2 frases em PT."}
 }
 
-CRÍTICO: article_summaries deve ter uma entrada para CADA um dos ${top8.length} artigos listados, usando a "chave" exata. inline_synthesis mínimo 5 frases com citações [N].`;
+CRÍTICO: article_summaries deve ter uma entrada para CADA um dos ${top8.length} artigos listados, usando a "chave" exata. inline_synthesis mínimo 6 frases com citações [N].`;
 }
 
 // ─── Groq (principal — 14.400 req/dia grátis, muito rápido) ──────────────────
@@ -257,7 +313,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Nenhuma chave de API configurada (GROQ_API_KEY, GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
 
   try {
-    const prompt = buildUserPrompt(query, articles);
+    const computedICM = computeICM(articles);
+    const prompt = buildUserPrompt(query, articles, computedICM);
 
     // Cadeia de prioridade: Groq → Google AI → OpenRouter
     let raw: string;
@@ -301,6 +358,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const jsonEnd = cleaned.lastIndexOf("}");
     const jsonStr = jsonStart !== -1 && jsonEnd !== -1 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
     const synthesis = JSON.parse(jsonStr);
+
+    // Sobrescreve confidence_score com o valor programático (mais confiável que a IA)
+    synthesis.confidence_score = computedICM;
+    synthesis.confidence_level = icmLabel(computedICM);
 
     return res.status(200).json({ synthesis });
   } catch (err) {
