@@ -92,9 +92,14 @@ function computeICM(articles: ArticleInput[]): number {
   const baseScore = top.reduce((sum, a) => {
     const ts = STUDY_SCORES[a.study_type] ?? 50;
     const ss = SOURCE_SCORES[a.source] ?? 65;
-    // Peer review implied by type (ts >= 65 = journal article ou superior)
     const peerBonus = ts >= 65 ? 10 : 0;
-    return sum + ts * 0.45 + ss * 0.30 + peerBonus * 0.25;
+    // Citações: paper com 200+ cit. recebe pontuação máxima (200 → 100pts)
+    const citW = Math.min(100, Math.floor(a.citations / 2));
+    // Recência: publicações recentes têm mais impacto
+    const yr = parseInt(a.year) || 2000;
+    const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
+    // Pesos: Tipo(35%) Fonte(25%) PeerReview(20%) Citações(15%) Recência(5%)
+    return sum + ts * 0.35 + ss * 0.25 + peerBonus * 0.20 + citW * 0.15 + yearW * 0.05;
   }, 0) / top.length;
   // Bônus de diversidade: mais bases consultadas = evidência mais ampla (max +15)
   const uniqueSources = new Set(top.map(a => a.source)).size;

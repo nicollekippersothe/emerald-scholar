@@ -118,14 +118,17 @@ const Index = () => {
         "OpenAlex": 80, "CrossRef": 80, "DOAJ": 75, "SciELO": 75,
         "Europe PMC": 75, "BVS/LILACS": 70, "CORE": 70, "BASE": 65, "arXiv": 55,
       };
-      const top8 = (articles as { study_type: string; source: string }[]).slice(0, 8);
+      const top8 = (articles as { study_type: string; source: string; citations: number; year: string }[]).slice(0, 8);
       const provisionalICM = top8.length > 0
         ? (() => {
             const base = top8.reduce((sum, a) => {
               const ts = STUDY_SCORES[a.study_type] ?? 50;
               const ss = SOURCE_SCORES[a.source] ?? 65;
               const pb = ts >= 65 ? 10 : 0;
-              return sum + ts * 0.45 + ss * 0.30 + pb * 0.25;
+              const citW = Math.min(100, Math.floor((a.citations ?? 0) / 2));
+              const yr = parseInt(a.year) || 2000;
+              const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
+              return sum + ts * 0.35 + ss * 0.25 + pb * 0.20 + citW * 0.15 + yearW * 0.05;
             }, 0) / top8.length;
             const uniqueSources = new Set(top8.map(a => a.source)).size;
             const diversityBonus = Math.min(15, (uniqueSources - 1) * 4);
