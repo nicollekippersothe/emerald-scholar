@@ -367,9 +367,12 @@ const Index = () => {
           </div>
 
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-3 sm:mb-4 leading-tight text-center">
-            Evidências claras,<br />
-            <span className="text-primary italic">decisões melhores</span>
+            Seu assistente de <br />
+            <span className="text-primary italic">pesquisa científica</span>
           </h2>
+          <p className="text-xs sm:text-sm text-muted-foreground/70 -mt-2 mb-4 sm:mb-6 italic tracking-wide text-center">
+            Evidências claras, decisões melhores
+          </p>
 
           <p className="text-foreground/70 text-sm sm:text-lg mb-7 sm:mb-10 max-w-2xl text-center px-1">
             Busca simultânea em PubMed, Cochrane, SciELO, arXiv e mais 9 bases científicas — com análise de consenso, confiança metodológica e referências ABNT automáticas.
