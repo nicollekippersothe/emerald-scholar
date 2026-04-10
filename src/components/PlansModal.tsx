@@ -61,7 +61,7 @@ const PlansModal = ({
       <div className="bg-background border border-foreground/10 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-extrabold text-foreground">Planos Scholar<span className="text-primary">IA</span></h2>
+            <h2 className="text-2xl font-extrabold text-foreground">Planos Clar<span className="text-primary">a</span></h2>
             <p className="text-sm text-muted-foreground mt-1">Escolha o plano ideal para sua pesquisa</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-foreground/5 transition-colors">

@@ -680,7 +680,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-foreground/5 text-foreground/60 border border-foreground/10 hover:border-primary/20 hover:text-foreground transition-colors"
           >
-            <Search size={11} /> Scholar
+            <Search size={11} /> Google Scholar
           </a>
         )}
         {article.is_oa && article.pdf_url && (
@@ -1287,7 +1287,7 @@ const ResultsView = ({
             <BrainCircuit className="text-primary size-6 shrink-0" />
             <button onClick={onBack} className="flex items-center">
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight">
-                Scholar<span className="text-primary">IA</span>
+                Clar<span className="text-primary">a</span>
               </h1>
             </button>
             <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">

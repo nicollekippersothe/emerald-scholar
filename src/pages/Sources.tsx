@@ -184,7 +184,7 @@ const Sources = () => {
           <BrainCircuit className="text-primary size-6" />
           <Link to="/" className="flex items-center">
             <h1 className="text-xl font-extrabold tracking-tight">
-              Scholar<span className="text-primary">IA</span>
+              Clar<span className="text-primary">a</span>
             </h1>
           </Link>
           <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">

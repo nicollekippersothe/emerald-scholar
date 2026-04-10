@@ -64,7 +64,7 @@ export default function AuthModal({ open, onClose, reason = "default" }: AuthMod
           <div className="flex items-center gap-2">
             <BrainCircuit size={18} className="text-primary" />
             <span className="font-extrabold text-foreground">
-              Scholar<span className="text-primary">IA</span>
+              Clar<span className="text-primary">a</span>
             </span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors">
