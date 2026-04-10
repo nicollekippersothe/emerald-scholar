@@ -20,6 +20,15 @@ import {
   LogIn,
   LogOut,
   UserCircle,
+  Search,
+  Layers,
+  ShieldCheck,
+  Quote,
+  Sparkles,
+  GitMerge,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth, getLocalSearchesLeftPublic } from "@/hooks/useAuth";
@@ -36,6 +45,73 @@ const SC_BADGES = [
   { name: "Cochrane", color: "#7C3AED" },
   { name: "SciELO", color: "#22C55E" },
   { name: "arXiv", color: "#F97316" },
+  { name: "OpenAlex", color: "#60A5FA" },
+  { name: "CrossRef", color: "#F59E0B" },
+  { name: "DOAJ", color: "#34D399" },
+  { name: "Europe PMC", color: "#818CF8" },
+  { name: "CORE", color: "#FB923C" },
+  { name: "Lens.org", color: "#38BDF8" },
+  { name: "BVS/LILACS", color: "#4ADE80" },
+];
+
+const HOW_IT_WORKS = [
+  {
+    step: "01",
+    icon: Search,
+    title: "Faça sua pergunta",
+    desc: "Em português, como você pensaria. Pode ser uma dúvida clínica, tema de dissertação ou hipótese de pesquisa.",
+  },
+  {
+    step: "02",
+    icon: Layers,
+    title: "Clara busca em 13 bases",
+    desc: "PubMed, Cochrane, SciELO, arXiv e mais — simultaneamente, em segundos, sem você precisar acessar cada uma.",
+  },
+  {
+    step: "03",
+    icon: ShieldCheck,
+    title: "Receba síntese com confiança",
+    desc: "Cada artigo tem ICM, tipo de estudo e ABNT automático. Você vê o consenso entre os estudos de forma imediata.",
+  },
+];
+
+const DIFFERENTIALS = [
+  {
+    icon: AlertTriangle,
+    iconColor: "text-rose-400",
+    bgColor: "bg-rose-500/10 border-rose-500/20",
+    label: "IAs convencionais",
+    points: [
+      "Inventam referências que não existem",
+      "Sem acesso a publicações recentes",
+      "Uma resposta genérica, sem fontes verificáveis",
+    ],
+    negative: true,
+  },
+  {
+    icon: CheckCircle2,
+    iconColor: "text-primary",
+    bgColor: "bg-primary/10 border-primary/20",
+    label: "Clara",
+    points: [
+      "Artigos reais com DOI verificável",
+      "Dados em tempo real das maiores bases",
+      "Consenso, ICM e ABNT — tudo junto",
+    ],
+    negative: false,
+  },
+  {
+    icon: Clock,
+    iconColor: "text-amber-400",
+    bgColor: "bg-amber-500/10 border-amber-500/20",
+    label: "Fazer sozinho",
+    points: [
+      "Horas navegando em bases separadas",
+      "Sem síntese nem análise de consenso",
+      "Formatação ABNT manual e propensa a erros",
+    ],
+    negative: true,
+  },
 ];
 
 const QUICK_SEARCHES = [
@@ -48,12 +124,12 @@ const QUICK_SEARCHES = [
 ];
 
 const FEATURES = [
-  { icon: Database, title: "Principais bases científicas", desc: "PubMed, Semantic Scholar, Cochrane, SciELO, arXiv e mais — publicações indexadas nas fontes mais relevantes da ciência." },
-  { icon: BarChart3, title: "Consenso científico", desc: "Percentual de estudos que concordam, são inconclusivos ou contradizem." },
-  { icon: Gauge, title: "Índice de confiança", desc: "Pondera cada estudo pelo tipo e citações. Meta-análises pesam mais." },
-  { icon: FileText, title: "Referência ABNT", desc: "Gerada automaticamente. Copiável com um clique." },
-  { icon: Link2, title: "DOI verificável", desc: "Link direto para o artigo oficial antes de citar." },
-  { icon: FileSearch, title: "Dissecar PDF", desc: "Em breve: envie qualquer artigo e receba objetivo, amostra, p-valor e limitações." },
+  { icon: Layers, color: "text-blue-400", bg: "bg-blue-500/10", title: "13 bases simultâneas", desc: "PubMed, Cochrane, SciELO, arXiv, OpenAlex e mais — uma busca, todas as fontes relevantes da ciência." },
+  { icon: GitMerge, color: "text-violet-400", bg: "bg-violet-500/10", title: "Análise de consenso", desc: "Veja o percentual de estudos que concordam, divergem ou são inconclusivos sobre o tema." },
+  { icon: Gauge, color: "text-primary", bg: "bg-primary/10", title: "ICM — Índice de Confiança", desc: "Cada artigo é pontuado pelo design, citações e revisão por pares. Meta-análises pesam mais." },
+  { icon: Quote, color: "text-amber-400", bg: "bg-amber-500/10", title: "ABNT automático", desc: "Citação gerada e copiável com um clique. Sem formatar manualmente nunca mais." },
+  { icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-500/10", title: "DOI verificável", desc: "Link direto para o artigo original. Você confere antes de citar — sem alucinar fontes." },
+  { icon: Sparkles, color: "text-rose-400", bg: "bg-rose-500/10", title: "Síntese por IA", desc: "Resumo interpretativo em português, contextualizado à sua pergunta. Salve e compartilhe." },
 ];
 
 const Index = () => {
@@ -361,36 +437,42 @@ const Index = () => {
 
       {/* HERO SECTION */}
       <main className="flex flex-col items-center">
-        <section className="w-full bg-gradient-to-b from-background via-background to-background/80 px-4 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 flex flex-col items-center">
-          <div className="bg-foreground/10 text-primary px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 mb-5 sm:mb-6 border border-foreground/5">
-            <BookOpen size={14} /> PARA PESQUISA ACADÊMICA
+        <section className="hero-grid w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 flex flex-col items-center">
+          {/* Badge */}
+          <div className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 mb-6 border border-primary/20 tracking-wide uppercase">
+            <Sparkles size={13} /> Pesquisa científica com IA
           </div>
 
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-3 sm:mb-4 leading-tight text-center">
-            Seu assistente de <br />
-            <span className="text-primary italic">pesquisa científica</span>
+          {/* Headline */}
+          <h2 className="font-display text-3xl sm:text-5xl md:text-6xl font-extrabold text-foreground mb-3 leading-[1.1] text-center max-w-3xl glow-primary">
+            Seu assistente de{" "}
+            <span className="text-primary">pesquisa científica</span>
           </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground/70 -mt-2 mb-4 sm:mb-6 italic tracking-wide text-center">
+
+          {/* Slogan */}
+          <p className="text-sm sm:text-base text-muted-foreground/80 mb-5 italic tracking-wide text-center">
             Evidências claras, decisões melhores
           </p>
 
-          <p className="text-foreground/70 text-sm sm:text-lg mb-7 sm:mb-10 max-w-2xl text-center px-1">
-            Busca simultânea em PubMed, Cochrane, SciELO, arXiv e mais 9 bases científicas — com análise de consenso, confiança metodológica e referências ABNT automáticas.
+          {/* Subtítulo */}
+          <p className="text-foreground/60 text-sm sm:text-lg mb-10 reading-width text-center px-2 leading-relaxed">
+            Busca simultânea em 13 bases científicas — com análise de consenso,
+            confiança metodológica e referências ABNT automáticas, em português.
           </p>
 
           {/* SEARCH CARD */}
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-2xl bg-card/60 border border-foreground/10 rounded-2xl p-3 sm:p-5 mb-5 sm:mb-6 shadow-2xl"
+            className="w-full max-w-2xl bg-card/70 border border-foreground/10 rounded-2xl p-4 sm:p-6 mb-5 shadow-2xl backdrop-blur-sm"
           >
             <div className="relative mb-3">
-              <BrainCircuit className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ex: Impacto da microbiota intestinal na saúde mental: uma revisão sistemática"
-                className="w-full py-3 pl-12 pr-10 rounded-xl bg-background/50 border border-foreground/10 text-base placeholder:text-muted-foreground focus:ring-2 focus:ring-primary outline-none"
+                placeholder="Ex: microbiota intestinal e saúde mental: existe consenso?"
+                className="w-full py-3.5 pl-11 pr-10 rounded-xl bg-background/60 border border-foreground/10 text-base placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-primary outline-none"
               />
               {query && (
                 <button
@@ -405,7 +487,7 @@ const Index = () => {
             </div>
             <button
               type="submit"
-              className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-bold text-base hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-bold text-base hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-display"
             >
               Buscar e analisar <ArrowRight size={18} />
             </button>
@@ -426,26 +508,22 @@ const Index = () => {
             </div>
           )}
 
-          {/* Info line */}
           {!loading && (
             <>
-              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">
-                <span>{searchesLeft} buscas gratuitas, sem cadastro</span>
-                <button onClick={() => setShowPlans(true)} className="flex items-center gap-2 hover:text-foreground transition-colors">
-                  <BotMessageSquare size={15} /> Analisar um PDF
+              {/* Info line */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground mb-8">
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-primary" /> {searchesLeft} buscas gratuitas, sem cadastro</span>
+                <button onClick={() => setShowPlans(true)} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+                  <BotMessageSquare size={14} /> Analisar um PDF
                 </button>
               </div>
 
               {/* SOURCE BADGES */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mb-8 max-w-2xl">
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-8 max-w-3xl">
                 {SC_BADGES.map((sc) => (
                   <span
                     key={sc.name}
-                    style={{
-                      backgroundColor: `${sc.color}15`,
-                      color: sc.color,
-                      borderColor: `${sc.color}30`,
-                    }}
+                    style={{ backgroundColor: `${sc.color}15`, color: sc.color, borderColor: `${sc.color}30` }}
                     className="px-3 py-1 rounded-full text-xs font-semibold border"
                   >
                     {sc.name}
@@ -454,12 +532,12 @@ const Index = () => {
               </div>
 
               {/* QUICK SEARCHES */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-3xl">
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl">
                 {QUICK_SEARCHES.map((search) => (
                   <button
                     key={search}
                     onClick={() => handleSearch(search)}
-                    className="bg-card/50 border border-foreground/10 hover:border-primary/30 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm text-foreground/70 hover:text-foreground transition-colors text-center"
+                    className="bg-card/50 border border-foreground/10 hover:border-primary/40 hover:bg-primary/5 px-4 py-2 rounded-full text-xs text-foreground/60 hover:text-foreground transition-all"
                   >
                     {search}
                   </button>
@@ -469,53 +547,120 @@ const Index = () => {
           )}
         </section>
 
-        {/* FEATURES SECTION */}
         {!loading && (
-          <section className="w-full bg-foreground/[0.03] border-t border-foreground/5 px-6 py-20">
-            <div className="max-w-5xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-extrabold text-foreground text-center mb-3">
-                Feita para quem decide com base em evidências
-              </h3>
-              <p className="text-foreground/60 text-center mb-12 max-w-xl mx-auto">
-                Cada resultado vem com contexto, confiança metodológica e citação pronta — para você avaliar e seguir em frente.
-              </p>
+          <>
+            {/* HOW IT WORKS */}
+            <section className="w-full border-t border-foreground/5 px-6 py-20">
+              <div className="max-w-5xl mx-auto">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest text-center mb-3">Como funciona</p>
+                <h3 className="font-display text-2xl md:text-3xl font-extrabold text-foreground text-center mb-14">
+                  De uma pergunta à evidência — em segundos
+                </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {FEATURES.map((f, i) => (
-                  <div
-                    key={f.title}
-                    className={`bg-card/40 border border-foreground/5 rounded-2xl p-5 hover:border-primary/20 transition-colors ${
-                      i >= 4 ? "sm:col-span-1" : ""
-                    }`}
-                  >
-                    <f.icon className="text-primary mb-3" size={22} />
-                    <h4 className="font-bold text-foreground text-sm mb-1">{f.title}</h4>
-                    <p className="text-foreground/50 text-xs leading-relaxed">{f.desc}</p>
-                  </div>
-                ))}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                  {/* linha conectora (desktop) */}
+                  <div className="hidden md:block absolute top-10 left-[calc(16.5%+1rem)] right-[calc(16.5%+1rem)] h-px bg-foreground/10" />
+
+                  {HOW_IT_WORKS.map((step) => (
+                    <div key={step.step} className="flex flex-col items-center text-center px-4">
+                      <div className="relative mb-5">
+                        <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <step.icon size={32} className="text-primary" />
+                        </div>
+                        <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center font-display">
+                          {step.step.slice(1)}
+                        </span>
+                      </div>
+                      <h4 className="font-display font-bold text-foreground text-base mb-2">{step.title}</h4>
+                      <p className="text-foreground/55 text-sm leading-relaxed">{step.desc}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </section>
-        )}
+            </section>
 
-        {/* CTA SECTION */}
-        {!loading && (
-          <section className="w-full bg-gradient-to-b from-background to-background px-6 py-16">
-            <div className="max-w-md mx-auto text-center">
-              <h3 className="text-2xl font-extrabold text-foreground italic mb-3">
-                Comece agora
-              </h3>
-              <p className="text-muted-foreground text-sm mb-6">
-                3 buscas gratuitas. Sem cadastro.
-              </p>
-              <button
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-bold hover:brightness-110 active:scale-[0.97] transition-all inline-flex items-center gap-2"
-              >
-                Buscar artigos <ArrowRight size={18} />
-              </button>
-            </div>
-          </section>
+            {/* WHY CLARA */}
+            <section className="w-full bg-foreground/[0.025] border-t border-foreground/5 px-6 py-20">
+              <div className="max-w-5xl mx-auto">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest text-center mb-3">Por que Clara?</p>
+                <h3 className="font-display text-2xl md:text-3xl font-extrabold text-foreground text-center mb-4">
+                  IAs inventam. Bases não sintetizam.<br />Clara faz os dois — com evidência real.
+                </h3>
+                <p className="text-foreground/50 text-center text-sm mb-14 reading-width mx-auto">
+                  Pesquisadores, estudantes e profissionais de saúde precisam de fontes verificáveis — não de respostas inventadas.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {DIFFERENTIALS.map((d) => (
+                    <div key={d.label} className={`rounded-2xl border p-6 card-lift ${d.bgColor} ${d.negative ? "opacity-80" : ""}`}>
+                      <div className="flex items-center gap-3 mb-5">
+                        <d.icon size={20} className={d.iconColor} />
+                        <span className={`font-display font-bold text-sm ${d.negative ? "text-foreground/70" : "text-foreground"}`}>{d.label}</span>
+                        {!d.negative && <span className="ml-auto bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">Recomendado</span>}
+                      </div>
+                      <ul className="space-y-3">
+                        {d.points.map((p) => (
+                          <li key={p} className="flex items-start gap-2.5 text-sm text-foreground/70 leading-snug">
+                            <span className={`mt-0.5 shrink-0 ${d.negative ? "text-foreground/30" : "text-primary"}`}>
+                              {d.negative ? "×" : "✓"}
+                            </span>
+                            {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* FEATURES SECTION */}
+            <section className="w-full border-t border-foreground/5 px-6 py-20">
+              <div className="max-w-5xl mx-auto">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest text-center mb-3">Recursos</p>
+                <h3 className="font-display text-2xl md:text-3xl font-extrabold text-foreground text-center mb-4">
+                  Feita para quem decide com base em evidências
+                </h3>
+                <p className="text-foreground/50 text-center text-sm mb-14 reading-width mx-auto">
+                  Cada resultado vem com contexto suficiente para avaliar, citar e seguir em frente — sem abrir 13 abas diferentes.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {FEATURES.map((f) => (
+                    <div key={f.title} className="bg-card/40 border border-foreground/5 rounded-2xl p-6 card-lift hover:border-foreground/15">
+                      <div className={`w-11 h-11 rounded-xl ${f.bg} flex items-center justify-center mb-4`}>
+                        <f.icon size={22} className={f.color} />
+                      </div>
+                      <h4 className="font-display font-bold text-foreground text-sm mb-2">{f.title}</h4>
+                      <p className="text-foreground/50 text-sm leading-relaxed">{f.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* CTA SECTION */}
+            <section className="w-full border-t border-foreground/5 px-6 py-20">
+              <div className="max-w-lg mx-auto text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
+                  <BrainCircuit size={30} className="text-primary" />
+                </div>
+                <h3 className="font-display text-2xl sm:text-3xl font-extrabold text-foreground mb-3">
+                  Comece agora — é gratuito
+                </h3>
+                <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+                  {searchesLeft} buscas gratuitas. Sem cadastro.<br />
+                  Resultados reais de bases científicas indexadas.
+                </p>
+                <button
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className="bg-primary text-primary-foreground px-10 py-4 rounded-2xl font-bold text-base hover:brightness-110 active:scale-[0.97] transition-all inline-flex items-center gap-2 font-display"
+                >
+                  Fazer minha primeira busca <ArrowRight size={18} />
+                </button>
+              </div>
+            </section>
+          </>
         )}
 
       </main>
