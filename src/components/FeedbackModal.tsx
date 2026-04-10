@@ -1,5 +1,10 @@
 import { useState } from "react";
+import emailjs from "@emailjs/browser";
 import { X, MessageSquarePlus, CheckCircle2, Bug, Lightbulb, HelpCircle } from "lucide-react";
+
+const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID  ?? "";
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID ?? "";
+const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  ?? "";
 
 interface FeedbackModalProps {
   open: boolean;
@@ -23,15 +28,22 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
 
   if (!open) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!text.trim()) return;
     setSending(true);
-    // Simulated send — in production replace with fetch() to backend or a form service
-    setTimeout(() => {
-      console.log("[Emerald Scholar Feedback]", { type, text, email });
-      setSending(false);
+    try {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        { feedback_type: type, message: text, reply_to: email || "não informado" },
+        { publicKey: EMAILJS_PUBLIC_KEY },
+      );
       setSent(true);
-    }, 900);
+    } catch {
+      alert("Erro ao enviar. Tente novamente.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleClose = () => {
@@ -61,7 +73,7 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
             </div>
             <div>
               <h2 className="font-extrabold text-foreground text-base">Feedback & Suporte</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Versão demonstrativa · Emerald Scholar BETA</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Emerald Scholar · BETA</p>
             </div>
           </div>
           <button
