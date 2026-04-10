@@ -7,6 +7,7 @@
   ],
   "functions": {
     "api/search.ts": { "maxDuration": 30 },
-    "api/summarize.ts": { "maxDuration": 60 }
+    "api/summarize.ts": { "maxDuration": 60 },
+    "api/feedback.ts": { "maxDuration": 10 }
   }
 }

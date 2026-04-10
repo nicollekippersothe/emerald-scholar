@@ -1,10 +1,5 @@
 import { useState } from "react";
-import emailjs from "@emailjs/browser";
 import { X, MessageSquarePlus, CheckCircle2, Bug, Lightbulb, HelpCircle } from "lucide-react";
-
-const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID  ?? "";
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID ?? "";
-const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  ?? "";
 
 interface FeedbackModalProps {
   open: boolean;
@@ -32,12 +27,12 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
     if (!text.trim()) return;
     setSending(true);
     try {
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        { feedback_type: type, message: text, reply_to: email || "não informado" },
-        { publicKey: EMAILJS_PUBLIC_KEY },
-      );
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, message: text, email }),
+      });
+      if (!res.ok) throw new Error();
       setSent(true);
     } catch {
       alert("Erro ao enviar. Tente novamente.");
