@@ -40,19 +40,7 @@ function getLocalSearchesLeft(): number {
 
 // Exported so Index.tsx can use it without Supabase
 export function getLocalSearchesLeftPublic(): number {
-  try {
-    const resetAt = localStorage.getItem(LS_RESET_KEY);
-    const now = new Date().toDateString();
-    if (resetAt !== now) {
-      localStorage.setItem(LS_KEY, "3");
-      localStorage.setItem(LS_RESET_KEY, now);
-      return 3;
-    }
-    const v = localStorage.getItem(LS_KEY);
-    return v !== null ? Math.max(0, parseInt(v, 10)) : 3;
-  } catch {
-    return 3;
-  }
+  return 999; // Fase beta aberta — sem limite de buscas
 }
 
 // Ugly but needed — LS_SEARCHES_LEFT_VALUE is the same as LS_KEY

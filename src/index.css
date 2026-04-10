@@ -6,24 +6,24 @@
 
 @layer base {
   :root {
-    /* ── Dark Mode (padrão) — verde esmeralda ── */
-    --background: 160 82% 13%;
-    --foreground: 0 0% 100%;
+    /* ── Dark Mode — azul-ardósia profundo com toque esmeralda ── */
+    --background: 222 28% 8%;
+    --foreground: 210 20% 95%;
 
-    --card: 220 47% 11%;
-    --card-foreground: 0 0% 100%;
+    --card: 222 25% 11%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 220 47% 11%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 222 25% 11%;
+    --popover-foreground: 210 20% 95%;
 
     --primary: 155 80% 67%;
     --primary-foreground: 160 82% 13%;
 
-    --secondary: 220 47% 11%;
-    --secondary-foreground: 210 20% 90%;
+    --secondary: 222 25% 14%;
+    --secondary-foreground: 210 20% 88%;
 
-    --muted: 220 20% 20%;
-    --muted-foreground: 215 15% 65%;
+    --muted: 222 20% 18%;
+    --muted-foreground: 215 14% 58%;
 
     --accent: 155 80% 67%;
     --accent-foreground: 160 82% 13%;
@@ -64,11 +64,11 @@
     --chat-ai-bg:   220 20% 14%;
 
     /* Sidebar */
-    --sidebar-background:         160 82% 10%;
+    --sidebar-background:         222 28% 6%;
     --sidebar-foreground:         0 0% 90%;
     --sidebar-primary:            155 80% 67%;
     --sidebar-primary-foreground: 160 82% 13%;
-    --sidebar-accent:             220 47% 14%;
+    --sidebar-accent:             222 25% 14%;
     --sidebar-accent-foreground:  0 0% 90%;
     --sidebar-border:             0 0% 100% / 0.1;
     --sidebar-ring:               155 80% 67%;
@@ -149,12 +149,12 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.7;
+    font-size: 15px;
+    line-height: 1.65;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Sora', system-ui, sans-serif;
-    line-height: 1.25;
+    line-height: 1.2;
     letter-spacing: -0.02em;
   }
 }
@@ -163,26 +163,45 @@
   .font-display {
     font-family: 'Sora', system-ui, sans-serif;
   }
-  /* Glow sutil no primary — usado no hero */
   .glow-primary {
-    text-shadow: 0 0 40px hsl(var(--primary) / 0.4);
+    text-shadow: 0 0 48px hsl(var(--primary) / 0.35);
   }
-  /* Gradiente de fundo animado sutil */
   .hero-grid {
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--primary) / 0.12) 0%, transparent 60%),
-      linear-gradient(to bottom, transparent 0%, hsl(var(--background)) 100%);
+      radial-gradient(ellipse 70% 40% at 50% -5%, hsl(var(--primary) / 0.1) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 30% at 80% 60%, hsl(220 80% 60% / 0.05) 0%, transparent 50%);
   }
-  /* Card com hover lift */
   .card-lift {
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   }
   .card-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px hsl(var(--primary) / 0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 36px hsl(var(--primary) / 0.12);
   }
-  /* Linha de texto confortável (max ~68 chars) */
   .reading-width {
-    max-width: 62ch;
+    max-width: 60ch;
   }
+
+  /* ── Animações de entrada ── */
+  .animate-fade-up {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.55s ease, transform 0.55s ease;
+  }
+  .animate-fade-up.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .animate-fade-in {
+    opacity: 0;
+    transition: opacity 0.55s ease;
+  }
+  .animate-fade-in.in-view {
+    opacity: 1;
+  }
+  /* delay helpers */
+  .delay-100 { transition-delay: 0.1s; }
+  .delay-200 { transition-delay: 0.2s; }
+  .delay-300 { transition-delay: 0.3s; }
+  .delay-400 { transition-delay: 0.4s; }
 }
