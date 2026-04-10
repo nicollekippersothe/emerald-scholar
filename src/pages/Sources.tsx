@@ -345,7 +345,7 @@ const Sources = () => {
         {/* Footer note */}
         <div className="mt-6 sm:mt-8 text-center">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            O Emerald Scholar utiliza dados demonstrativos nesta versão BETA. Em produção, os resultados virão diretamente das APIs das bases listadas acima.
+            Clara consulta as APIs reais das bases científicas listadas acima e traz resultados atualizados a cada busca.
           </p>
           <Link
             to="/"

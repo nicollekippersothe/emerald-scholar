@@ -68,7 +68,7 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
             </div>
             <div>
               <h2 className="font-extrabold text-foreground text-base">Feedback & Suporte</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Emerald Scholar · BETA</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Clara · BETA</p>
             </div>
           </div>
           <button
@@ -102,7 +102,7 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
             {/* Pitch text */}
             <p className="text-sm text-muted-foreground leading-relaxed bg-foreground/[0.03] rounded-xl p-3 border border-foreground/5">
               Estamos em constante evolução. Encontrou um bug ou tem uma sugestão?{" "}
-              <span className="text-foreground/80 font-medium">Ajude-nos a melhorar o Emerald Scholar.</span>
+              <span className="text-foreground/80 font-medium">Ajude-nos a melhorar o Clara.</span>
             </p>
 
             {/* Type selector */}

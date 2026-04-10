@@ -1,5 +1,5 @@
 /**
- * Tipos e constantes compartilhados do ScholarIA.
+ * Tipos e constantes compartilhados da Clara.
  * Os dados mock foram removidos — a app usa APIs reais em produção.
  */
 

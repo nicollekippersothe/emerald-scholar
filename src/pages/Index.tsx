@@ -243,7 +243,7 @@ const Index = () => {
             <BrainCircuit className="text-primary size-6 shrink-0" />
             <button onClick={handleBack} aria-label="Voltar para o início" className="flex items-center">
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight">
-                Scholar<span className="text-primary">IA</span>
+                Clar<span className="text-primary">a</span>
               </h1>
             </button>
             <span className="bg-foreground/10 text-xs font-bold px-2 py-0.5 rounded text-primary">
@@ -367,13 +367,12 @@ const Index = () => {
           </div>
 
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-3 sm:mb-4 leading-tight text-center">
-            Seu assistente de <br />
-            <span className="text-primary italic">pesquisa científica</span>
+            Evidências claras,<br />
+            <span className="text-primary italic">decisões melhores</span>
           </h2>
 
           <p className="text-foreground/70 text-sm sm:text-lg mb-7 sm:mb-10 max-w-2xl text-center px-1">
-            Inclui publicações de PubMed, Cochrane, SciELO, arXiv e outras — filtra os artigos revisados por
-            especialistas e mostra o nível de confiabilidade de cada fonte.
+            Busca simultânea em PubMed, Cochrane, SciELO, arXiv e mais 9 bases científicas — com análise de consenso, confiança metodológica e referências ABNT automáticas.
           </p>
 
           {/* SEARCH CARD */}
@@ -472,11 +471,10 @@ const Index = () => {
           <section className="w-full bg-foreground/[0.03] border-t border-foreground/5 px-6 py-20">
             <div className="max-w-5xl mx-auto">
               <h3 className="text-2xl md:text-3xl font-extrabold text-foreground text-center mb-3">
-                Uma ferramenta feita para quem pesquisa de verdade
+                Feita para quem decide com base em evidências
               </h3>
               <p className="text-foreground/60 text-center mb-12 max-w-xl mx-auto">
-                Cada resultado vem com contexto suficiente para você avaliar, citar e
-                seguir em frente.
+                Cada resultado vem com contexto, confiança metodológica e citação pronta — para você avaliar e seguir em frente.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
