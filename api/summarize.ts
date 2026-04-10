@@ -12,9 +12,10 @@ const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-3-12b-it:
 
 // Groq — 14.400 req/dia grátis, muito rápido
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+// 8b-instant primeiro: mais rápido e não conflita com o 70b usado nos abstracts
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant",
+  "llama-3.3-70b-versatile",
   "gemma2-9b-it",
 ];
 
@@ -206,14 +207,15 @@ async function callGroq(prompt: string): Promise<string> {
           { role: "user", content: prompt },
         ],
         temperature: 0.25,
-        max_tokens: 4000,
+        max_tokens: 3000,
       }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (res.status === 429 || res.status === 503) {
       lastError = String(res.status);
-      await res.text(); // drena o body
-      console.warn(`[api/summarize] Groq ${model} indisponível (${res.status})`)
+      await res.text();
+      console.warn(`[api/summarize] Groq ${model} indisponível (${res.status})`);
       continue;
     }
 
@@ -316,12 +318,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
 
-  const { query, articles } = req.body as { query: string; articles: ArticleInput[] };
-  if (!query || !articles?.length)
+  const { query, articles: allArticles } = req.body as { query: string; articles: ArticleInput[] };
+  if (!query || !allArticles?.length)
     return res.status(400).json({ error: "query e articles são obrigatórios" });
 
   if (!GROQ_API_KEY && !GOOGLE_AI_KEY && !OPENROUTER_API_KEY)
     return res.status(500).json({ error: "Nenhuma chave de API configurada (GROQ_API_KEY, GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
+
+  // Limita aos top-20 para não explodir o contexto do modelo
+  const articles = allArticles.slice(0, 20);
 
   try {
     const computedICM = computeICM(articles);

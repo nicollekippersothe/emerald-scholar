@@ -501,14 +501,14 @@ const Index = () => {
         synthesis = sumData.synthesis;
       } else {
         failed = true;
-        // Síntese mínima — sem texto genérico que polui o painel
+        // Preserva ICM provisório correto — não sobrescreve com 60 fixo
         synthesis = {
           direct_answer: "",
           consensus_agree: 0,
           consensus_inconclusive: 100,
           consensus_contradict: 0,
-          confidence_level: "média",
-          confidence_score: 60,
+          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 55 ? "média" : "limitada",
+          confidence_score: provisionalICM,
           confidence_reasons: [],
           inconclusive_summary: "",
           contradict_explanation: "",
