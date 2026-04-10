@@ -516,7 +516,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                 {/* Main abstract block */}
                 <div className="bg-muted/40 px-4 pt-3 pb-3 rounded-xl border border-border/60">
                   <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wide mb-2 flex items-center gap-2">
-                    {resumoPt ? "Resumo (IA)" : article.isMock ? "Sobre este estudo" : "Abstract"}
+                    {resumoPt ? "Resumo (IA)" : "Abstract"}
                     {article.abstract_generated && !resumoPt && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500/80 border border-amber-500/20 text-[9px] font-semibold normal-case tracking-normal">
                         ✦ Estimado por IA
@@ -649,17 +649,8 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
 
       {/* Actions */}
       <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-        {/* Artigo mock → badge de demonstração */}
-        {article.isMock && (
-          <span
-            title="Dados de demonstração — este artigo é simulado para fins de demonstração"
-            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-help"
-          >
-            <AlertTriangle size={11} /> Demo
-          </span>
-        )}
-        {/* Artigos reais: Semantic Scholar como link primário */}
-        {!article.isMock && article.url && (
+        {/* Link primário para o artigo */}
+        {article.url && (
           <a
             href={article.url}
             target="_blank"
@@ -670,7 +661,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
           </a>
         )}
         {/* DOI como link secundário quando disponível */}
-        {!article.isMock && article.doi && (
+        {article.doi && (
           <a
             href={`https://doi.org/${article.doi}`}
             target="_blank"
@@ -681,8 +672,8 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             <ExternalLink size={11} /> DOI
           </a>
         )}
-        {/* Fallback Google Scholar: mock ou artigo real sem url e sem doi */}
-        {(article.isMock || (!article.url && !article.doi)) && (
+        {/* Fallback Google Scholar: artigo sem url e sem doi */}
+        {(!article.url && !article.doi) && (
           <a
             href={`https://scholar.google.com/scholar?q=${encodeURIComponent(article.title)}`}
             target="_blank"
@@ -1528,19 +1519,6 @@ const ResultsView = ({
               : <SourceLoadingIndicator loadedSources={loadedSources} />
             }
 
-            {/* BANNER: MODO DEMONSTRAÇÃO */}
-            {result.articles.some((a) => a.isMock) && (
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm mb-4">
-                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold mb-0.5">Modo demonstração — busca em tempo real indisponível</p>
-                  <p className="text-xs text-amber-400/80">
-                    A API de busca não respondeu e o sistema carregou dados de exemplo.
-                    Os artigos abaixo são simulados. Use "Buscar no Scholar" para acessar publicações reais.
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* QUERY INTENTION INDICATOR */}
             <div className={`rounded-2xl p-4 mb-6 border ${

@@ -815,10 +815,19 @@ async function enrichCitationsFromS2(articles: Article[]): Promise<void> {
   } catch { /* non-fatal */ }
 }
 
-/** Gera um resumo em português via Groq contextualizado à busca do usuário. */
+/** Gera ou traduz um resumo completo em português via Groq contextualizado à busca do usuário. */
 async function generateAbstractWithGroq(article: Article, userQuery: string): Promise<string> {
   if (!GROQ_API_KEY) return "";
   try {
+    const hasAbstract = article.abstract_pt.trim().length > 80;
+    const systemPrompt = hasAbstract
+      ? "Você é um assistente acadêmico. Traduza o abstract abaixo para português brasileiro de forma completa e fiel, preservando todos os dados numéricos (n amostral, p-valor, HR, OR, IC95%, tamanho de efeito), a estrutura (contexto, objetivo, método, resultados, conclusão) e o nível de detalhe do original. Não omita dados. Responda APENAS com o texto traduzido, sem prefácio."
+      : "Você é um assistente acadêmico especializado em síntese de evidências científicas. Com base nos metadados fornecidos, redija um resumo completo em português com 5-6 frases cobrindo: (1) contexto e problema investigado, (2) objetivo do estudo, (3) desenho metodológico e amostra, (4) principais achados com dados numéricos quando inferíveis pelo tipo de estudo, (5) conclusão e implicações clínicas ou práticas. Seja específico e informativo — evite generalidades. Responda APENAS com o resumo, sem título nem prefácio.";
+
+    const userContent = hasAbstract
+      ? `Busca do usuário: "${userQuery}"\n\nTítulo: ${article.title}\nPeriódico: ${article.journal}\nTipo: ${article.study_type}\nAno: ${article.year}\nCitações: ${article.citations}\n\nAbstract original:\n${article.abstract_pt.slice(0, 2000)}`
+      : `Busca do usuário: "${userQuery}"\n\nTítulo: ${article.title}\nPeriódico: ${article.journal}\nTipo de estudo: ${article.study_type}\nAno: ${article.year}\nCitações: ${article.citations}${article.tldr ? `\nTL;DR (Semantic Scholar): ${article.tldr}` : ""}`;
+
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -826,22 +835,15 @@ async function generateAbstractWithGroq(article: Article, userQuery: string): Pr
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         messages: [
-          {
-            role: "system",
-            content:
-              "Você é um assistente acadêmico especializado em síntese de evidências científicas. Com base nos metadados fornecidos, escreva 2-3 frases em português descrevendo o conteúdo deste artigo, destacando o que é relevante para a busca do usuário. Seja objetivo, use dados numéricos quando possível. Responda APENAS com o resumo, sem prefácio ou explicação.",
-          },
-          {
-            role: "user",
-            content: `Busca do usuário: "${userQuery}"\n\nTítulo: ${article.title}\nPeriódico: ${article.journal}\nTipo de estudo: ${article.study_type}\nAno: ${article.year}\nCitações: ${article.citations}`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
-        temperature: 0.3,
-        max_tokens: 160,
+        temperature: 0.15,
+        max_tokens: 450,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return "";
     const data = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -852,11 +854,11 @@ async function generateAbstractWithGroq(article: Article, userQuery: string): Pr
 }
 
 /**
- * Enriquece artigos com abstract e TLDR do Semantic Scholar:
+ * Enriquece artigos com abstract, TLDR e resumo em português via Groq:
  * 1) S2 batch (via DOI) — abstract real + tldr para TODOS os artigos com DOI
- *    - Se não tem abstract: usa o S2 abstract (real)
- *    - TLDR é salvo em article.tldr independentemente (contexto extra para síntese)
- * 2) Groq como último recurso apenas para artigos sem abstract E sem TLDR
+ * 2) Groq para os top-8 artigos:
+ *    - Sem abstract → gera resumo contextualizado à busca
+ *    - Com abstract em inglês → traduz e adapta para PT-BR
  * Artigos enriquecidos recebem abstract_generated: true.
  */
 async function enrichMissingAbstracts(articles: Article[], userQuery: string): Promise<void> {
@@ -869,28 +871,29 @@ async function enrichMissingAbstracts(articles: Article[], userQuery: string): P
   for (const article of withDoi) {
     const s2 = s2Map[article.doi];
     if (!s2) continue;
-    // Sempre salva TLDR quando disponível (contexto extra para a síntese)
+    // Sempre salva TLDR quando disponível
     if (s2.tldr) article.tldr = s2.tldr;
     // Preenche abstract vazio com abstract real do S2
     if (!article.abstract_pt.trim() && s2.abstract) {
       article.abstract_pt = s2.abstract;
-      article.abstract_generated = true;
     }
   }
 
-  // Groq apenas para artigos ainda sem abstract E sem tldr (evita hallucination)
-  const stillMissing = articles
-    .filter((a) => !a.abstract_pt.trim() && !a.tldr)
-    .slice(0, 6);
-  if (stillMissing.length > 0) {
+  // Groq para os top-8: traduz inglês → PT e gera resumos faltantes
+  // Artigos PT já têm o abstract no idioma certo, ignorar
+  const needsGroq = articles
+    .slice(0, 8)
+    .filter((a) => a.language !== "pt");
+
+  if (needsGroq.length > 0 && GROQ_API_KEY) {
     const generated = await Promise.allSettled(
-      stillMissing.map((a) => generateAbstractWithGroq(a, userQuery))
+      needsGroq.map((a) => generateAbstractWithGroq(a, userQuery))
     );
-    for (let i = 0; i < stillMissing.length; i++) {
+    for (let i = 0; i < needsGroq.length; i++) {
       const r = generated[i];
       if (r.status === "fulfilled" && r.value) {
-        stillMissing[i].abstract_pt = r.value;
-        stillMissing[i].abstract_generated = true;
+        needsGroq[i].abstract_pt = r.value;
+        needsGroq[i].abstract_generated = true;
       }
     }
   }
@@ -1023,9 +1026,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : "";
   const finalQuery = expandedQuery + langHint;
 
-  const isPtSearch = lang.includes("pt") || lang.includes("es") ||
-    /[àáâãäçèéêëíïóôõöúü]/i.test(q) ||
-    /\b(são|não|com|para|como|que|dos|das|uma|sobre|por|mais|saúde|tratamento|efeito|estudo|pesquisa|doença|pacientes)\b/i.test(q);
 
   const isPsych = isPsychQuery(q);
 
@@ -1081,14 +1081,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .split(/[\s,?!.]+/)
     .filter((t) => t.length > 3);
 
+  // Auto-tag PT para fontes que publicam primariamente em português
+  for (const a of unique) {
+    if (!a.language && (a.source === "SciELO" || a.source === "BVS/LILACS")) {
+      a.language = "pt";
+    }
+  }
+
   unique.sort((a, b) => {
-    const ptBoostA = isPtSearch && a.language === "pt" ? 5 : 0;
-    const ptBoostB = isPtSearch && b.language === "pt" ? 5 : 0;
+    // PT boost forte — artigos em PT sobem significativamente
+    const ptBoostA = a.language === "pt" ? 12 : 0;
+    const ptBoostB = b.language === "pt" ? 12 : 0;
+    // Relevância: maior peso — título vale 3, abstract vale 1 por termo
+    const relA = relevanceScore(a, queryTerms) * 2;
+    const relB = relevanceScore(b, queryTerms) * 2;
     // Confidence boost: normaliza 40-95 → 0-3 pontos adicionais
     const confBoostA = (a.confidence_score - 40) / 18.3;
     const confBoostB = (b.confidence_score - 40) / 18.3;
-    const scoreA = relevanceScore(a, queryTerms) + ptBoostA + confBoostA;
-    const scoreB = relevanceScore(b, queryTerms) + ptBoostB + confBoostB;
+    const scoreA = relA + ptBoostA + confBoostA;
+    const scoreB = relB + ptBoostB + confBoostB;
     if (Math.abs(scoreB - scoreA) > 0.1) return scoreB - scoreA;
     return b.citations - a.citations;
   });
