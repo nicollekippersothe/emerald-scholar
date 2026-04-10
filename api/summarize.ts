@@ -123,7 +123,7 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
 }
 
 function buildUserPrompt(query: string, articles: ArticleInput[], computedICM: number): string {
-  const top8 = articles.slice(0, 12); // variável mantida por compatibilidade com o prompt
+  const top8 = articles.slice(0, 8);
 
   const articlesList = top8
     .map((a, i) => {
@@ -187,7 +187,7 @@ Retorne APENAS este JSON sem markdown:
   "resumos_pt": {"CHAVE": "Resumo 1-2 frases em PT."}
 }
 
-CRÍTICO: article_summaries deve ter uma entrada para CADA um dos ${top8.length} artigos listados, usando a "chave" exata. inline_synthesis mínimo 6 frases com citações [N].`;
+CRÍTICO: article_summaries deve ter uma entrada para CADA um dos ${top8.length} artigos listados, usando a chave numérica exata ("1", "2", ..., "${top8.length}"). inline_synthesis mínimo 5 frases com citações [N]. Seja conciso em resumo_tecnico e resumo_popular (2-3 frases cada).`;
 }
 
 // ─── Groq (principal — 14.400 req/dia grátis, muito rápido) ──────────────────
@@ -207,7 +207,7 @@ async function callGroq(prompt: string): Promise<string> {
           { role: "user", content: prompt },
         ],
         temperature: 0.25,
-        max_tokens: 3000,
+        max_tokens: 5000,
       }),
       signal: AbortSignal.timeout(45000),
     });
@@ -215,7 +215,8 @@ async function callGroq(prompt: string): Promise<string> {
     if (res.status === 429 || res.status === 503) {
       lastError = String(res.status);
       await res.text();
-      console.warn(`[api/summarize] Groq ${model} indisponível (${res.status})`);
+      console.warn(`[api/summarize] Groq ${model} indisponível (${res.status}), aguardando 2s...`);
+      await new Promise(r => setTimeout(r, 2000));
       continue;
     }
 

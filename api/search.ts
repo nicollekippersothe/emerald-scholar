@@ -932,7 +932,7 @@ async function fetchCORE(query: string): Promise<Article[]> {
         is_oa: true,
         doi,
         abstract: r.abstract ?? "",
-        studyType: "estudo observacional",
+        studyType: studyTypeFromLabel(r.documentType ?? r.type ?? "journal-article"),
         url: doi ? `https://doi.org/${doi}` : (r.downloadUrl ?? undefined),
       });
     });
@@ -979,7 +979,7 @@ async function fetchLensOrg(query: string): Promise<Article[]> {
         is_oa: r.open_access?.is_oa ?? false,
         doi,
         abstract: r.abstract ?? "",
-        studyType: "estudo observacional",
+        studyType: studyTypeFromLabel(r.doc_type ?? r.publication_type ?? "journal-article"),
         url: doi ? `https://doi.org/${doi}` : undefined,
       });
     });
