@@ -212,7 +212,7 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
       {!loading && (
         <>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-5 text-xs text-muted-foreground mb-5">
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-primary" /> Gratuito, sem cadastro</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-primary" /> Resultados reais de bases indexadas</span>
             <button onClick={() => setShowPlans(true)} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
               <BotMessageSquare size={13} /> Analisar um PDF
             </button>
@@ -367,10 +367,10 @@ function CtaSection({ searchesLeft }: { searchesLeft: number }) {
           <BrainCircuit size={24} className="text-primary" />
         </div>
         <h3 className="font-display text-xl sm:text-2xl font-extrabold text-foreground mb-2">
-          Comece agora, é gratuito
+          Comece agora
         </h3>
         <p className="text-muted-foreground text-xs mb-6 leading-relaxed">
-          Sem cadastro. Resultados reais de bases científicas indexadas.
+          Resultados reais de bases científicas indexadas, em português.
         </p>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
