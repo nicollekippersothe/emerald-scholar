@@ -158,25 +158,25 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
 }) {
   return (
     <section className="hero-grid w-full px-4 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 flex flex-col items-center">
-      <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 mb-5 border border-primary/20 tracking-wide uppercase">
+      <div className="hero-in hero-d0 bg-primary/10 text-primary px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 mb-5 border border-primary/20 tracking-wide uppercase">
         <Sparkles size={11} /> Pesquisa científica com IA
       </div>
 
-      <h2 className="font-display text-2xl sm:text-4xl md:text-[2.75rem] font-extrabold text-foreground mb-2 leading-tight text-center max-w-2xl glow-primary">
+      <h2 className="hero-in hero-d1 font-display text-2xl sm:text-4xl md:text-[2.75rem] font-extrabold text-foreground mb-2 leading-tight text-center max-w-2xl glow-primary">
         Seu assistente de{" "}
         <span className="text-primary">pesquisa científica</span>
       </h2>
 
-      <p className="text-xs sm:text-sm text-muted-foreground/70 mb-4 italic tracking-wide text-center">
+      <p className="hero-in hero-d2 text-xs sm:text-sm text-muted-foreground/70 mb-4 italic tracking-wide text-center">
         Evidências claras, decisões melhores
       </p>
 
-      <p className="text-foreground/55 text-sm mb-7 reading-width text-center px-2 leading-relaxed">
+      <p className="hero-in hero-d3 text-foreground/55 text-sm mb-7 reading-width text-center px-2 leading-relaxed">
         Busca simultânea em 13 bases científicas com análise de consenso,
         confiança metodológica e referências ABNT automáticas, em português.
       </p>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-2xl bg-card/70 border border-foreground/10 rounded-2xl p-3 sm:p-5 mb-4 shadow-xl backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="hero-in hero-d4 w-full max-w-2xl bg-card/70 border border-foreground/10 rounded-2xl p-3 sm:p-5 mb-4 shadow-xl backdrop-blur-sm">
         <div className="relative mb-3">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <input
@@ -211,14 +211,14 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
 
       {!loading && (
         <>
-          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-5 text-xs text-muted-foreground mb-5">
+          <div className="hero-in-fade hero-d5 flex flex-col sm:flex-row items-center gap-2 sm:gap-5 text-xs text-muted-foreground mb-5">
             <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-primary" /> Resultados reais de bases indexadas</span>
             <button onClick={() => setShowPlans(true)} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
               <BotMessageSquare size={13} /> Analisar um PDF
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mb-6 max-w-3xl">
+          <div className="hero-in-fade hero-d6 flex flex-wrap items-center justify-center gap-1.5 mb-6 max-w-3xl">
             {SC_BADGES.map((sc) => (
               <span key={sc.name}
                 style={{ backgroundColor: `${sc.color}15`, color: sc.color, borderColor: `${sc.color}30` }}
@@ -228,7 +228,7 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
             ))}
           </div>
 
-          <div className="flex flex-col items-center gap-2 w-full max-w-3xl">
+          <div className="hero-in-fade hero-d6 flex flex-col items-center gap-2 w-full max-w-3xl">
             <div className="flex items-center justify-between w-full px-1">
               <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider flex items-center gap-1">
                 {recents.length > 0 ? <><Clock size={10} /> Buscas recentes</> : <><Sparkles size={10} /> Sugestões</>}
@@ -268,8 +268,8 @@ function HowItWorksSection() {
           <div className="hidden md:block absolute top-9 left-[calc(16.5%+1rem)] right-[calc(16.5%+1rem)] h-px bg-foreground/8" />
           {HOW_IT_WORKS.map((step, i) => (
             <div key={step.step}
-              className={`animate-fade-up ${inView ? "in-view" : ""} delay-${(i + 1) * 100} flex flex-col items-center text-center px-3`}>
-              <div className="relative mb-4">
+              className={`animate-fade-up ${inView ? "in-view" : ""} delay-${(i + 1) * 200} flex flex-col items-center text-center px-3`}>
+              <div className={`animate-scale-in ${inView ? "in-view" : ""} delay-${(i + 1) * 200 + 100} relative mb-4`}>
                 <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <step.icon size={26} className="text-primary" />
                 </div>
@@ -343,8 +343,8 @@ function FeaturesSection() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f, i) => (
             <div key={f.title}
-              className={`animate-fade-up ${inView ? "in-view" : ""} delay-${Math.min((i + 1) * 100, 400)} bg-card/40 border border-foreground/5 rounded-xl p-5 card-lift hover:border-foreground/12`}>
-              <div className={`w-9 h-9 rounded-lg ${f.bg} flex items-center justify-center mb-3`}>
+              className={`animate-fade-up ${inView ? "in-view" : ""} delay-${[100, 200, 300, 200, 300, 400][i] ?? 400} bg-card/40 border border-foreground/5 rounded-xl p-5 card-lift hover:border-foreground/12`}>
+              <div className={`animate-scale-in ${inView ? "in-view" : ""} delay-${[200, 300, 400, 300, 400, 500][i] ?? 500} w-9 h-9 rounded-lg ${f.bg} flex items-center justify-center mb-3`}>
                 <f.icon size={18} className={f.color} />
               </div>
               <h4 className="font-display font-bold text-foreground text-xs mb-1.5">{f.title}</h4>

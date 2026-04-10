@@ -6,14 +6,14 @@
 
 @layer base {
   :root {
-    /* ── Dark Mode — azul-ardósia profundo com toque esmeralda ── */
-    --background: 222 28% 8%;
+    /* ── Dark Mode — azul-ardósia com toque esmeralda ── */
+    --background: 222 24% 11%;
     --foreground: 210 20% 95%;
 
-    --card: 222 25% 11%;
+    --card: 222 22% 14%;
     --card-foreground: 210 20% 95%;
 
-    --popover: 222 25% 11%;
+    --popover: 222 22% 14%;
     --popover-foreground: 210 20% 95%;
 
     --primary: 155 80% 67%;
@@ -64,7 +64,7 @@
     --chat-ai-bg:   220 20% 14%;
 
     /* Sidebar */
-    --sidebar-background:         222 28% 6%;
+    --sidebar-background:         222 24% 9%;
     --sidebar-foreground:         0 0% 90%;
     --sidebar-primary:            155 80% 67%;
     --sidebar-primary-foreground: 160 82% 13%;
@@ -182,11 +182,12 @@
     max-width: 60ch;
   }
 
-  /* ── Animações de entrada ── */
+  /* ── Animações de entrada no scroll ── */
   .animate-fade-up {
     opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.55s ease, transform 0.55s ease;
+    transform: translateY(30px);
+    transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .animate-fade-up.in-view {
     opacity: 1;
@@ -194,14 +195,50 @@
   }
   .animate-fade-in {
     opacity: 0;
-    transition: opacity 0.55s ease;
+    transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .animate-fade-in.in-view {
     opacity: 1;
   }
+  /* Scale-in para ícones e badges */
+  .animate-scale-in {
+    opacity: 0;
+    transform: scale(0.82) translateY(10px);
+    transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .animate-scale-in.in-view {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
   /* delay helpers */
-  .delay-100 { transition-delay: 0.1s; }
-  .delay-200 { transition-delay: 0.2s; }
-  .delay-300 { transition-delay: 0.3s; }
-  .delay-400 { transition-delay: 0.4s; }
+  .delay-100 { transition-delay: 0.08s; }
+  .delay-200 { transition-delay: 0.16s; }
+  .delay-300 { transition-delay: 0.26s; }
+  .delay-400 { transition-delay: 0.38s; }
+  .delay-500 { transition-delay: 0.50s; }
+  .delay-600 { transition-delay: 0.62s; }
+
+  /* ── Hero: animação na carga (keyframe, acima do fold) ── */
+  @keyframes hero-rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes hero-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .hero-in {
+    animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .hero-in-fade {
+    animation: hero-fade 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .hero-d0  { animation-delay: 0s; }
+  .hero-d1  { animation-delay: 0.1s; }
+  .hero-d2  { animation-delay: 0.2s; }
+  .hero-d3  { animation-delay: 0.32s; }
+  .hero-d4  { animation-delay: 0.45s; }
+  .hero-d5  { animation-delay: 0.60s; }
+  .hero-d6  { animation-delay: 0.72s; }
 }
