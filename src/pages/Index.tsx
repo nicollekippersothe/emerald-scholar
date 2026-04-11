@@ -42,18 +42,19 @@ import FeedbackModal from "@/components/FeedbackModal";
 import AuthModal from "@/components/AuthModal";
 
 const SC_BADGES = [
-  { name: "PubMed", color: "#EF4444" },
+  { name: "PubMed",           color: "#EF4444" },
   { name: "Semantic Scholar", color: "#A78BFA" },
-  { name: "Cochrane", color: "#7C3AED" },
-  { name: "SciELO", color: "#22C55E" },
-  { name: "arXiv", color: "#F97316" },
-  { name: "OpenAlex", color: "#60A5FA" },
-  { name: "CrossRef", color: "#F59E0B" },
-  { name: "DOAJ", color: "#34D399" },
-  { name: "Europe PMC", color: "#818CF8" },
-  { name: "CORE", color: "#FB923C" },
-  { name: "Lens.org", color: "#38BDF8" },
-  { name: "BVS/LILACS", color: "#4ADE80" },
+  { name: "Cochrane",         color: "#7C3AED" },
+  { name: "SciELO",           color: "#22C55E" },
+  { name: "arXiv",            color: "#F97316" },
+  { name: "OpenAlex",         color: "#60A5FA" },
+  { name: "CrossRef",         color: "#F59E0B" },
+  { name: "DOAJ",             color: "#34D399" },
+  { name: "Europe PMC",       color: "#818CF8" },
+  { name: "CORE",             color: "#FB923C" },
+  { name: "Lens.org",         color: "#38BDF8" },
+  { name: "BVS/LILACS",       color: "#4ADE80" },
+  { name: "BASE",             color: "#94A3B8" },
 ];
 
 const HOW_IT_WORKS = [
@@ -157,45 +158,55 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
   recents: string[]; clearRecents: () => void;
 }) {
   return (
-    <section className="hero-grid w-full px-4 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 flex flex-col items-center">
-      <div className="hero-in hero-d0 bg-primary/10 text-primary px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 mb-5 border border-primary/20 tracking-wide uppercase">
-        <Sparkles size={11} /> Pesquisa científica com IA
+    <section className="hero-grid w-full px-4 sm:px-6 pt-8 sm:pt-14 pb-6 sm:pb-10 flex flex-col items-center">
+
+      {/* ── Logo central animada ── */}
+      <div className="hero-in hero-d0 flex flex-col items-center mb-5">
+        <div className="relative mb-2.5">
+          {/* Anel de gradiente */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/40 via-blue-500/20 to-violet-500/30 blur-md scale-110" />
+          <div className="relative w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] rounded-2xl bg-background/80 border border-white/10 flex items-center justify-center shadow-xl backdrop-blur-sm">
+            <BrainCircuit size={32} className="brain-animated" />
+          </div>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="gradient-brand font-display text-[2rem] sm:text-[2.25rem] font-black tracking-tight leading-none">
+            Clara
+          </span>
+          <span className="text-[10px] font-extrabold text-muted-foreground/40 uppercase tracking-widest mb-0.5">IA</span>
+        </div>
+        <p className="text-[11px] sm:text-xs text-muted-foreground/55 mt-1 italic tracking-wide">
+          Evidências claras, decisões melhores
+        </p>
       </div>
 
-      <h2 className="hero-in hero-d1 font-display text-2xl sm:text-4xl md:text-[2.75rem] font-extrabold text-foreground mb-2 leading-tight text-center max-w-2xl glow-primary">
-        Seu assistente de{" "}
-        <span className="text-primary">pesquisa científica</span>
+      {/* ── Headline ── */}
+      <h2 className="hero-in hero-d1 font-display text-lg sm:text-2xl md:text-[1.75rem] font-extrabold text-foreground mb-6 leading-snug text-center max-w-xl">
+        Pesquise em <span className="text-primary">13 bases científicas</span> com{" "}
+        análise de consenso por IA
       </h2>
 
-      <p className="hero-in hero-d2 text-xs sm:text-sm text-muted-foreground/70 mb-4 italic tracking-wide text-center">
-        Evidências claras, decisões melhores
-      </p>
-
-      <p className="hero-in hero-d3 text-foreground/55 text-sm mb-7 reading-width text-center px-2 leading-relaxed">
-        Busca simultânea em 13 bases científicas com análise de consenso,
-        confiança metodológica e referências ABNT automáticas, em português.
-      </p>
-
-      <form onSubmit={handleSubmit} className="hero-in hero-d4 w-full max-w-2xl bg-card/70 border border-foreground/10 rounded-2xl p-3 sm:p-5 mb-4 shadow-xl backdrop-blur-sm">
-        <div className="relative mb-3">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+      {/* ── Formulário de busca ── */}
+      <form onSubmit={handleSubmit} className="hero-in hero-d2 w-full max-w-2xl bg-card/60 border border-foreground/10 rounded-2xl p-3 sm:p-4 mb-3 shadow-xl backdrop-blur-sm">
+        <div className="relative mb-2.5">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ex: microbiota intestinal e saúde mental: existe consenso?"
-            className="w-full py-3 pl-10 pr-9 rounded-xl bg-background/60 border border-foreground/10 text-sm placeholder:text-muted-foreground/55 focus:ring-2 focus:ring-primary outline-none"
+            className="w-full py-3 pl-10 pr-9 rounded-xl bg-background/60 border border-foreground/10 text-sm placeholder:text-muted-foreground/45 focus:ring-2 focus:ring-primary outline-none"
           />
           {query && (
             <button type="button" aria-label="Limpar busca" onClick={() => setQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <X size={15} />
+              <X size={14} />
             </button>
           )}
         </div>
         <button type="submit"
-          className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-display">
-          Buscar e analisar <ArrowRight size={16} />
+          className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-display">
+          Buscar e analisar <ArrowRight size={15} />
         </button>
       </form>
 
@@ -206,35 +217,53 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
         </div>
       )}
       {searchError && !loading && (
-        <div className="text-center py-6 text-destructive"><p className="font-semibold text-sm">{searchError}</p></div>
+        <div className="text-center py-4 text-destructive"><p className="font-semibold text-sm">{searchError}</p></div>
       )}
 
       {!loading && (
         <>
-          <div className="hero-in-fade hero-d5 flex flex-col sm:flex-row items-center gap-2 sm:gap-5 text-xs text-muted-foreground mb-5">
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-primary" /> Resultados reais de bases indexadas</span>
+          {/* ── Trust strip ── */}
+          <div className="hero-in-fade hero-d3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[11px] text-muted-foreground/55 mb-5">
+            <span className="flex items-center gap-1.5">
+              <Database size={10} className="text-primary/70" /> 13 bases indexadas
+            </span>
+            <span className="hidden sm:block text-foreground/15">·</span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={10} className="text-primary/70" /> DOI verificável
+            </span>
+            <span className="hidden sm:block text-foreground/15">·</span>
+            <span className="flex items-center gap-1.5">
+              <FileText size={10} className="text-primary/70" /> ABNT automático
+            </span>
+            <span className="hidden sm:block text-foreground/15">·</span>
             <button onClick={() => setShowPlans(true)} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
-              <BotMessageSquare size={13} /> Analisar um PDF
+              <BotMessageSquare size={10} /> Analisar PDF
             </button>
           </div>
 
-          <div className="hero-in-fade hero-d6 flex flex-wrap items-center justify-center gap-1.5 mb-6 max-w-3xl">
-            {SC_BADGES.map((sc) => (
-              <span key={sc.name}
-                style={{ backgroundColor: `${sc.color}15`, color: sc.color, borderColor: `${sc.color}30` }}
-                className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold border">
-                {sc.name}
-              </span>
-            ))}
+          {/* ── Marquee: todas as 13 bases ── */}
+          <div className="hero-in-fade hero-d4 w-full overflow-hidden mb-5 relative">
+            <div className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+            <div className="marquee-inner gap-2 py-0.5">
+              {[...SC_BADGES, ...SC_BADGES].map((sc, i) => (
+                <span key={i}
+                  style={{ backgroundColor: `${sc.color}12`, color: sc.color, borderColor: `${sc.color}28` }}
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap flex-shrink-0">
+                  <span className="mr-1 opacity-60">●</span>{sc.name}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="hero-in-fade hero-d6 flex flex-col items-center gap-2 w-full max-w-3xl">
+          {/* ── Sugestões / Buscas recentes ── */}
+          <div className="hero-in-fade hero-d5 flex flex-col items-center gap-2 w-full max-w-3xl">
             <div className="flex items-center justify-between w-full px-1">
-              <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider flex items-center gap-1">
-                {recents.length > 0 ? <><Clock size={10} /> Buscas recentes</> : <><Sparkles size={10} /> Sugestões</>}
+              <span className="text-[10px] font-semibold text-muted-foreground/45 uppercase tracking-wider flex items-center gap-1">
+                {recents.length > 0 ? <><Clock size={9} /> Buscas recentes</> : <><Sparkles size={9} /> Sugestões</>}
               </span>
               {recents.length > 0 && (
-                <button onClick={clearRecents} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+                <button onClick={clearRecents} className="text-[10px] text-muted-foreground/35 hover:text-muted-foreground transition-colors">
                   limpar
                 </button>
               )}
@@ -242,7 +271,7 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
             <div className="flex flex-wrap items-center justify-center gap-1.5">
               {(recents.length > 0 ? recents : QUICK_SEARCHES).map((search) => (
                 <button key={search} onClick={() => handleSearch(search)}
-                  className="bg-card/50 border border-foreground/10 hover:border-primary/40 hover:bg-primary/5 px-3.5 py-1.5 rounded-full text-xs text-foreground/55 hover:text-foreground transition-all">
+                  className="bg-card/40 border border-foreground/8 hover:border-primary/35 hover:bg-primary/5 px-3 py-1.5 rounded-full text-[11px] text-foreground/50 hover:text-foreground/80 transition-all">
                   {search}
                 </button>
               ))}

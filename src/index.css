@@ -241,4 +241,58 @@
   .hero-d4  { animation-delay: 0.45s; }
   .hero-d5  { animation-delay: 0.60s; }
   .hero-d6  { animation-delay: 0.72s; }
+
+  /* ── Logo: cérebro colorido animado ── */
+  @keyframes brain-pulse {
+    0%, 100% {
+      color: hsl(155 80% 67%);
+      filter: drop-shadow(0 0 10px hsl(155 80% 67% / 0.55));
+    }
+    35% {
+      color: hsl(195 80% 62%);
+      filter: drop-shadow(0 0 14px hsl(195 80% 62% / 0.55));
+    }
+    70% {
+      color: hsl(250 72% 72%);
+      filter: drop-shadow(0 0 12px hsl(250 72% 72% / 0.50));
+    }
+  }
+  .brain-animated {
+    animation: brain-pulse 5s ease-in-out infinite;
+  }
+
+  /* ── "Clara" com gradiente animado ── */
+  @keyframes gradient-pan {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .gradient-brand {
+    background: linear-gradient(
+      90deg,
+      hsl(155 80% 67%),
+      hsl(195 75% 65%),
+      hsl(250 70% 74%),
+      hsl(155 80% 67%)
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient-pan 5s ease-in-out infinite;
+  }
+
+  /* ── Marquee infinito ── */
+  @keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .marquee-inner {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 28s linear infinite;
+  }
+  .marquee-inner:hover {
+    animation-play-state: paused;
+  }
 }
