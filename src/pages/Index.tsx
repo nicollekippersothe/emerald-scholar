@@ -528,6 +528,20 @@ const Index = () => {
       if (sumRes.ok) {
         const sumData = await sumRes.json();
         synthesis = sumData.synthesis;
+        // Propaga icm_source por artigo (chave "1".."N") recebido do backend
+        if (sumData.synthesis?.icm_sources) {
+          const sources: Record<string, "full_text" | "abstract"> = sumData.synthesis.icm_sources;
+          setResult((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              articles: prev.articles.map((a, i) => ({
+                ...a,
+                icm_source: sources[String(i + 1)] ?? "abstract",
+              })),
+            };
+          });
+        }
       } else {
         failed = true;
         // Preserva ICM provisório correto — não sobrescreve com 60 fixo

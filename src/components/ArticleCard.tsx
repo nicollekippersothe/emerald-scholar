@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from "react";
-import { ChevronDown, Copy, Check, MessageCircle, Bookmark, BookmarkCheck, Unlock } from "lucide-react";
+import { ChevronDown, Copy, Check, MessageCircle, Bookmark, BookmarkCheck, Unlock, FileText, FileSearch } from "lucide-react";
 import type { Article } from "@/data/mockDatabase";
 import { STUDY_TYPE_MAP, EVIDENCE_LABELS } from "@/data/mockDatabase";
 
@@ -172,6 +172,22 @@ const ArticleCard = ({ article, index, saved, onSave }: ArticleCardProps) => {
                 📎 {article.citations.toLocaleString()} citações
               </span>
             )}
+            {/* ICM source indicator */}
+            {article.icm_source === "full_text" ? (
+              <span
+                title="O ICM deste artigo foi calculado com base no texto completo, permitindo avaliação mais precisa de tamanho amostral, p-valor e limitações declaradas."
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full cursor-help"
+              >
+                <FileText size={10} /> ICM — texto completo
+              </span>
+            ) : article.icm_source === "abstract" ? (
+              <span
+                title="O ICM deste artigo foi calculado com base apenas no resumo (abstract). Texto completo não estava disponível em acesso aberto."
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400/80 bg-amber-500/8 border border-amber-500/15 px-2 py-0.5 rounded-full cursor-help"
+              >
+                <FileSearch size={10} /> ICM — resumo
+              </span>
+            ) : null}
           </div>
 
           {/* Evidence score */}

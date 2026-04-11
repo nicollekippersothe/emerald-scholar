@@ -41,6 +41,8 @@ export interface Article {
   abstract_generated?: boolean;
   /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
   tldr?: string;
+  /** Indica se o ICM foi calculado com base em texto completo ou apenas resumo */
+  icm_source?: "full_text" | "abstract";
 }
 
 export interface CitedSource {

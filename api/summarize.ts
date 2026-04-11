@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { batchGetFullText, type FullTextResult } from "./lib/fullTextFetcher";
 
 // Aumenta timeout da função Vercel de 10s → 60s
 export const config = { maxDuration: 60 };
@@ -47,14 +48,24 @@ interface ArticleInput {
   tldr?: string;
 }
 
+/** ArticleInput enriched with full-text metadata before sending to the LLM */
+interface EnrichedArticle extends ArticleInput {
+  _full_text?: string;
+  _text_source: "full_text" | "abstract";
+  _text_provider: string;
+  /** Forwarded to the client for the visual badge */
+  icm_source: "full_text" | "abstract";
+}
+
 // ─── Prompts ─────────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `Você é um Professor Doutor especialista em síntese de evidências científicas, com vasta experiência em revisões sistemáticas e meta-análises. Sua missão é gerar sínteses de nível acadêmico, claras, rigorosas e acessíveis.
 
 Regras absolutas:
 - Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON.
 - Toda síntese deve ser em Português do Brasil (PT-BR) fluído e científico.
-- NUNCA invente achados, resultados ou conclusões que não estejam explicitamente descritos no abstract fornecido.
-- Se o abstract de um artigo for "Abstract não disponível.", "N/A" ou tiver menos de 60 caracteres: os campos resumo_popular e resumo_tecnico devem reconhecer isso explicitamente — não deduza achados a partir do título.
+- NUNCA invente achados, resultados ou conclusões que não estejam explicitamente descritos no texto fornecido.
+- Quando o artigo vier com "Texto completo": use-o para extrair dados metodológicos precisos — tamanho amostral (n), p-valor, HR/OR/RR, limitações declaradas, design do estudo. Seja mais específico e rigoroso nesses casos.
+- Quando o artigo vier apenas com "Abstract": baseie-se exclusivamente nele. Se for "[SEM ABSTRACT]", reconheça explicitamente que não há dados disponíveis.
 - Em inline_synthesis: aponte divergências explicitamente ("Embora [N] aponte X, [M] sugere Y").
 - title_pt: traduza o título para PT-BR de forma fiel. Se já estiver em português, repita o mesmo texto.`;
 
@@ -87,7 +98,28 @@ const SOURCE_SCORES: Record<string, number> = {
   "arXiv": 55,
 };
 
-function computeICM(articles: ArticleInput[]): number {
+/**
+ * Analyse full text for methodological quality signals.
+ * Returns 0–10 bonus points based on content found.
+ */
+function fullTextQualityBonus(text: string): number {
+  if (!text || text.length < 200) return 0;
+  const t = text.toLowerCase();
+  let bonus = 0;
+  // Sample size reported
+  if (/\bn\s*[=≥>]\s*\d{2,}/.test(t) || /\d{2,}\s*(participan|pacien|patient|subject|indivídu)/.test(t)) bonus += 3;
+  // Statistical results (p-value, HR, OR, RR, CI)
+  if (/p\s*[=<>]\s*0\.\d+/.test(t) || /\b(hazard ratio|odds ratio|risco relativo|confidence interval)\b/.test(t)) bonus += 2;
+  // Limitations section explicitly declared
+  if (/\b(limitaç|limitation|limitación)\b/.test(t)) bonus += 2;
+  // Methods/design clearly described
+  if (/\b(randomizad|randomized|double.blind|duplo.cego|controlled trial|ensaio clínico)\b/.test(t)) bonus += 2;
+  // References/bibliography present
+  if (/\b(referências|references|bibliography)\b/.test(t)) bonus += 1;
+  return Math.min(10, bonus);
+}
+
+function computeICM(articles: EnrichedArticle[]): number {
   if (articles.length === 0) return 50;
   const top = articles.slice(0, 8);
   const baseScore = top.reduce((sum, a) => {
@@ -99,8 +131,10 @@ function computeICM(articles: ArticleInput[]): number {
     // Recência: publicações recentes têm mais impacto
     const yr = parseInt(a.year) || 2000;
     const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
+    // Full-text quality bonus (0–10 pts based on methodological signals in the text)
+    const ftBonus = a._text_source === "full_text" ? fullTextQualityBonus(a._full_text ?? "") : 0;
     // Pesos: Tipo(35%) Fonte(25%) PeerReview(20%) Citações(15%) Recência(5%)
-    return sum + ts * 0.35 + ss * 0.25 + peerBonus * 0.20 + citW * 0.15 + yearW * 0.05;
+    return sum + ts * 0.35 + ss * 0.25 + peerBonus * 0.20 + citW * 0.15 + yearW * 0.05 + ftBonus;
   }, 0) / top.length;
   // Bônus de diversidade: mais bases consultadas = evidência mais ampla (max +15)
   const uniqueSources = new Set(top.map(a => a.source)).size;
@@ -122,7 +156,7 @@ function classifyVenue(a: ArticleInput): "journal" | "conference" | "preprint" |
   return "journal";
 }
 
-function buildUserPrompt(query: string, articles: ArticleInput[], computedICM: number): string {
+function buildUserPrompt(query: string, articles: EnrichedArticle[], computedICM: number): string {
   const top8 = articles.slice(0, 8);
 
   const articlesList = top8
@@ -135,9 +169,19 @@ function buildUserPrompt(query: string, articles: ArticleInput[], computedICM: n
       const venue = a.journal ? ` | ${a.journal}` : "";
       const rawAbstract = a.abstract_pt?.trim() ?? "";
       const hasRealAbstract = rawAbstract.length >= 60 && rawAbstract !== "Abstract não disponível.";
-      const abstract = hasRealAbstract ? rawAbstract.slice(0, 400) : "[SEM ABSTRACT — não inferir achados a partir do título]";
+
+      let textBlock: string;
+      if (a._text_source === "full_text" && a._full_text && a._full_text.length >= 200) {
+        // Full text available — use up to 2000 chars; note the source for the LLM
+        const snippet = a._full_text.slice(0, 2000);
+        textBlock = `Texto completo (${a._text_provider}): ${snippet}`;
+      } else {
+        const abstract = hasRealAbstract ? rawAbstract.slice(0, 600) : "[SEM ABSTRACT — não inferir achados a partir do título]";
+        textBlock = `Abstract: ${abstract}`;
+      }
+
       const tldrLine = a.tldr ? `\nTL;DR (S2): ${a.tldr}` : "";
-      return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\nAbstract: ${abstract}${tldrLine}`;
+      return `[${i + 1}] chave:"${i + 1}" | ${a.title} (${a.authors}, ${a.year}) — ${a.study_type}, ${a.citations} cit., ${a.source}${venue} [${venueTag}]\n${textBlock}${tldrLine}`;
     })
     .join("\n\n");
 
@@ -327,9 +371,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Nenhuma chave de API configurada (GROQ_API_KEY, GOOGLE_AI_KEY ou OPENROUTER_API_KEY)" });
 
   // Limita aos top-20 para não explodir o contexto do modelo
-  const articles = allArticles.slice(0, 20);
+  const rawArticles = allArticles.slice(0, 20);
 
   try {
+    // ── Enriquecimento de texto completo (paralelo, silent fallback) ──────────
+    console.log(`[api/summarize] enriquecendo ${rawArticles.length} artigos com texto completo...`);
+    const fullTexts = await batchGetFullText(rawArticles);
+    const articles: EnrichedArticle[] = rawArticles.map((a, i) => {
+      const ft: FullTextResult = fullTexts[i];
+      return {
+        ...a,
+        _full_text: ft.source === "full_text" ? ft.text : undefined,
+        _text_source: ft.source,
+        _text_provider: ft.provider,
+        icm_source: ft.source,
+      };
+    });
+    const fullTextCount = articles.filter(a => a._text_source === "full_text").length;
+    console.log(`[api/summarize] texto completo obtido para ${fullTextCount}/${rawArticles.length} artigos`);
+
     const computedICM = computeICM(articles);
     const prompt = buildUserPrompt(query, articles, computedICM);
 
@@ -379,6 +439,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Sobrescreve confidence_score com o valor programático (mais confiável que a IA)
     synthesis.confidence_score = computedICM;
     synthesis.confidence_level = icmLabel(computedICM);
+
+    // Anexa icm_source por artigo (chave numérica "1".."N") para o cliente exibir o badge
+    synthesis.icm_sources = Object.fromEntries(
+      articles.slice(0, 8).map((a, i) => [String(i + 1), a.icm_source])
+    );
 
     return res.status(200).json({ synthesis });
   } catch (err) {
