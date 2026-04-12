@@ -149,13 +149,12 @@ function AnimSection({ children, className = "" }: { children: React.ReactNode; 
   );
 }
 
-function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, searchError, searchesLeft, setShowPlans, recents, clearRecents }: {
+function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, searchError, searchesLeft, setShowPlans }: {
   query: string; setQuery: (v: string) => void;
   handleSubmit: (e: FormEvent) => void;
   handleSearch: (s: string) => void;
   loading: boolean; searchError: string | null;
   searchesLeft: number; setShowPlans: (v: boolean) => void;
-  recents: string[]; clearRecents: () => void;
 }) {
   return (
     <section className="hero-grid w-full px-4 sm:px-6 pt-8 sm:pt-14 pb-6 sm:pb-10 flex flex-col items-center">
@@ -256,20 +255,13 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
             </div>
           </div>
 
-          {/* ── Principais buscas / Buscas recentes ── */}
+          {/* ── Principais buscas ── */}
           <div className="hero-in-fade hero-d5 flex flex-col items-center gap-3 w-full max-w-3xl">
-            <div className="flex items-center justify-between w-full px-1">
-              <span className="text-[10px] font-bold text-muted-foreground/55 uppercase tracking-wider flex items-center gap-1.5">
-                {recents.length > 0 ? <><Clock size={9} /> Buscas recentes</> : <><Sparkles size={9} /> Principais buscas</>}
-              </span>
-              {recents.length > 0 && (
-                <button onClick={clearRecents} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors">
-                  limpar
-                </button>
-              )}
-            </div>
+            <span className="text-[10px] font-bold text-muted-foreground/55 uppercase tracking-wider flex items-center gap-1.5 self-start px-1">
+              <Sparkles size={9} /> Principais buscas
+            </span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
-              {(recents.length > 0 ? recents : QUICK_SEARCHES).map((search) => (
+              {QUICK_SEARCHES.map((search) => (
                 <button key={search} onClick={() => handleSearch(search)}
                   className="bg-card/60 border border-foreground/10 hover:border-primary/40 hover:bg-primary/5 px-3 py-2.5 rounded-xl text-[11px] text-foreground/65 hover:text-foreground transition-all text-left leading-snug">
                   <Search size={10} className="inline mr-1.5 text-primary/50 shrink-0" />
@@ -428,7 +420,7 @@ const Index = () => {
   const [realSources, setRealSources] = useState<string[] | undefined>(undefined);
 
   const { user, signOut, decrementSearch } = useAuth();
-  const { recents, push: pushRecent, clear: clearRecents } = useRecentSearches();
+  const { push: pushRecent } = useRecentSearches();
 
   // searchesLeft: use Supabase user when available, localStorage otherwise
   const searchesLeft = user?.searchesLeft ?? getLocalSearchesLeftPublic();
@@ -742,8 +734,6 @@ const Index = () => {
           searchError={searchError}
           searchesLeft={searchesLeft}
           setShowPlans={setShowPlans}
-          recents={recents}
-          clearRecents={clearRecents}
         />
 
         {!loading && (
