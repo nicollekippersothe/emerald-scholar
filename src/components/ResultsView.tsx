@@ -1279,14 +1279,19 @@ const ResultsView = ({
       return effectiveRelB - effectiveRelA;
     });
 
-  // Artigos com overlap próximo de zero ficam ocultos por padrão
-  const LOW_HIDE_THRESHOLD = 0.10;
+  // Artigos com baixa relevância ficam ocultos por padrão
+  // Usa o campo low_relevance calculado pelo backend (mais confiável que o score frontend,
+  // pois o backend usa o texto original sem a contaminação do evidence_reason)
+  const LOW_HIDE_THRESHOLD = 0.10; // mantido para o fallback de artigos sem low_relevance
   const isRelevanceMode = sortOrder === "relevancia" || sortOrder === "relevancia_pt";
+  const isLowRelevance = (a: Article) =>
+    a.low_relevance === true ||
+    (!a.low_relevance && a.relevance_score === undefined && queryRelevanceScore(a, query) < LOW_HIDE_THRESHOLD);
   const articlesToShow = (isRelevanceMode && query && !showLowRelevance)
-    ? filteredArticles.filter(a => queryRelevanceScore(a, query) >= LOW_HIDE_THRESHOLD)
+    ? filteredArticles.filter(a => !isLowRelevance(a))
     : filteredArticles;
   const hiddenLowArticles = (isRelevanceMode && query)
-    ? filteredArticles.filter(a => queryRelevanceScore(a, query) < LOW_HIDE_THRESHOLD)
+    ? filteredArticles.filter(a => isLowRelevance(a))
     : [];
   const hiddenLowCount = hiddenLowArticles.length;
 
