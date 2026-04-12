@@ -97,6 +97,45 @@ function evScoreFromStudyType(studyType: string): number {
   return 3;
 }
 
+/**
+ * Gera uma frase de relevância conectando o artigo à busca do usuário.
+ * Programático — sem chamada de LLM.
+ */
+function buildEvidenceReason(article: Article, query: string): string {
+  const queryLower = query.toLowerCase().replace(/[?!.]+$/, "").trim();
+
+  // Extrai até 2 frases úteis do abstract (ignora abstracts gerados/curtos)
+  const abstract = article.abstract_pt?.trim() ?? "";
+  let abstractSnippet = "";
+  if (abstract.length > 80 && abstract !== "Abstract não disponível.") {
+    // Pega a primeira frase substantiva (>40 chars)
+    const sentences = abstract.split(/(?<=[.!?])\s+/);
+    const first = sentences.find((s) => s.length > 40);
+    if (first) abstractSnippet = first.replace(/\s+/g, " ").trim();
+  }
+
+  // Monta a frase de relevância
+  const studyLabel =
+    article.study_type === "meta-análise" ? "Esta meta-análise" :
+    article.study_type === "revisão sistemática" ? "Esta revisão sistemática" :
+    article.study_type === "ensaio clínico randomizado" ? "Este ensaio clínico randomizado" :
+    article.study_type === "coorte" ? "Este estudo de coorte" :
+    article.study_type === "preprint" ? "Este preprint" :
+    "Este estudo";
+
+  const citNote = article.citations >= 50
+    ? ` (${article.citations.toLocaleString()} citações)`
+    : article.citations > 0
+    ? ` (${article.citations} cit.)`
+    : "";
+
+  const connector = abstractSnippet
+    ? `${studyLabel}${citNote} aborda diretamente o tema "${queryLower}". ${abstractSnippet}`
+    : `${studyLabel}${citNote} é relevante para a busca sobre "${queryLower}".`;
+
+  return connector.length > 280 ? connector.slice(0, 280) + "…" : connector;
+}
+
 function buildArticle(p: {
   title: string;
   authors: string;
@@ -131,11 +170,13 @@ function buildArticle(p: {
     evidence_reason: `${p.studyType} com ${p.citations} citações.`,
     abnt: `${firstAuthor}. ${p.title}. ${p.journal || "s.n."}, ${p.year ?? "s.d."}.`,
     confidence_score: (() => {
-      const studyW = evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 30 : 50;
+      // evScore: 5=meta/rev.sist, 4=RCT, 3=coorte/observacional, 2=preprint, 1=fallback
+      const studyW = evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 35 : 45;
       const sourceW = 80; // domain_weight padrão para fontes da API
       const peerW = evScore >= 3 ? 100 : 0;
       const recencyW = p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40;
-      const citW = Math.min(100, Math.floor(p.citations / 10));
+      // citW: /2 em vez de /10 → 50 cits=25, 200 cits=100 (antes 50 cits=5)
+      const citW = Math.min(100, Math.floor(p.citations / 2));
       // Pesos espelhados do frontend: Study(30%) Domain(25%) Peer(25%) Recency(15%) Cit(5%)
       return Math.min(95, Math.max(30, Math.round(
         studyW * 0.30 + sourceW * 0.25 + peerW * 0.25 + recencyW * 0.15 + citW * 0.05
@@ -144,10 +185,10 @@ function buildArticle(p: {
     confidence_factors: {
       domain_weight: 80,
       peer_reviewed: evScore >= 3,
-      study_type_weight: evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 30 : 50,
+      study_type_weight: evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 35 : 45,
       recency_score:
         p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40,
-      citations_weight: Math.min(100, Math.floor(p.citations / 10)),
+      citations_weight: Math.min(100, Math.floor(p.citations / 2)),
     },
     ...(p.url ? { url: p.url } : {}),
     ...(p.language ? { language: p.language } : {}),
@@ -1086,6 +1127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!a.language && (a.source === "SciELO" || a.source === "BVS/LILACS")) {
       a.language = "pt";
     }
+  }
+
+  // Reescreve evidence_reason conectando cada artigo à busca do usuário
+  for (const a of unique) {
+    a.evidence_reason = buildEvidenceReason(a, q);
   }
 
   unique.sort((a, b) => {
