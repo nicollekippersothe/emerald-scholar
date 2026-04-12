@@ -43,6 +43,12 @@ export interface Article {
   tldr?: string;
   /** Indica se o ICM foi calculado com base em texto completo ou apenas resumo */
   icm_source?: "full_text" | "abstract";
+  /** true quando o tipo de estudo foi inferido do tipo de publicação, não do design real */
+  study_type_inferred?: boolean;
+  /** Score de relevância semântica 0-100 em relação à query do usuário */
+  relevance_score?: number;
+  /** true quando o artigo tem baixo overlap com os termos da busca */
+  low_relevance?: boolean;
 }
 
 export interface CitedSource {

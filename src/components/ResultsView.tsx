@@ -382,12 +382,21 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
             ✓ Avaliado por especialistas
           </span>
         )}
-        <span
-          className="bg-foreground/5 text-foreground/60 border border-foreground/10 px-2 py-0.5 rounded text-[10px] font-semibold cursor-help"
-          title={STUDY_TYPE_DESCRIPTIONS[article.study_type] ?? `Tipo de estudo: ${article.study_type}`}
-        >
-          {studyInfo.icon} {studyInfo.label}
-        </span>
+        {article.study_type_inferred ? (
+          <span
+            className="bg-muted/60 text-muted-foreground/50 border border-foreground/8 px-2 py-0.5 rounded text-[10px] font-medium italic cursor-help"
+            title="O tipo metodológico deste artigo não pôde ser identificado com precisão — verifique no artigo original."
+          >
+            📄 Tipo não identificado
+          </span>
+        ) : (
+          <span
+            className="bg-foreground/5 text-foreground/60 border border-foreground/10 px-2 py-0.5 rounded text-[10px] font-semibold cursor-help"
+            title={STUDY_TYPE_DESCRIPTIONS[article.study_type] ?? `Tipo de estudo: ${article.study_type}`}
+          >
+            {studyInfo.icon} {studyInfo.label}
+          </span>
+        )}
         {article.citations > 0 && (
           <span className="bg-foreground/5 text-foreground/60 border border-foreground/10 px-2 py-0.5 rounded text-[10px] font-semibold">
             📎 {article.citations.toLocaleString()} citações
@@ -536,8 +545,8 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                   )}
                 </div>
 
-                {/* Evidence reason — always show when abstract is short */}
-                {article.evidence_reason && (isShortAbstract || true) && (
+                {/* Evidence reason or "unavailable" badge */}
+                {article.evidence_reason ? (
                   <div className="bg-primary/[0.06] px-4 py-3 rounded-xl border border-primary/15">
                     <p className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
                       <FlaskConical size={10} />
@@ -547,7 +556,11 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
                     </p>
                     <p className="text-xs text-foreground/70 leading-relaxed">{article.evidence_reason}</p>
                   </div>
-                )}
+                ) : query ? (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-muted-foreground/15 bg-muted/40">
+                    <span className="text-[10px] text-muted-foreground/50 italic">Resumo indisponível — relevância não avaliada</span>
+                  </div>
+                ) : null}
 
                 {/* Extra context when abstract is very sparse */}
                 {isShortAbstract && (
@@ -1267,7 +1280,7 @@ const ResultsView = ({
     });
 
   // Artigos com overlap próximo de zero ficam ocultos por padrão
-  const LOW_HIDE_THRESHOLD = 0.02;
+  const LOW_HIDE_THRESHOLD = 0.10;
   const isRelevanceMode = sortOrder === "relevancia" || sortOrder === "relevancia_pt";
   const articlesToShow = (isRelevanceMode && query && !showLowRelevance)
     ? filteredArticles.filter(a => queryRelevanceScore(a, query) >= LOW_HIDE_THRESHOLD)

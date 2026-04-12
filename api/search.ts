@@ -68,26 +68,43 @@ interface Article {
   abstract_generated?: boolean;
   /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
   tldr?: string;
+  /** true quando o tipo de estudo foi inferido do tipo de publicação, não do design real */
+  study_type_inferred?: boolean;
+  /** Score de relevância semântica 0-100 em relação à query do usuário */
+  relevance_score?: number;
+  /** true quando o artigo tem baixo overlap com os termos da busca */
+  low_relevance?: boolean;
 }
 
-function studyTypeFromLabel(label: string): string {
+/** Returns { type, inferred: true } when the design is unknown and was guessed from publication type */
+function studyTypeFromLabel(label: string): { type: string; inferred: boolean } {
   const t = label.toLowerCase();
-  // Ordem: mais específico primeiro para evitar falsos positivos
-  if (t.includes("meta-analys") || t.includes("meta analys") || t.includes("metaanalys")) return "meta-análise";
-  if ((t.includes("systematic") && t.includes("review")) || t.includes("cochrane")) return "revisão sistemática";
-  if (t.includes("systematic")) return "revisão sistemática";
-  if (t.includes("narrative review") || t.includes("literature review") || t.includes("scoping review")) return "revisão narrativa";
-  if (t.includes("review")) return "revisão sistemática"; // review genérico → sistemática
-  if (t.includes("randomized") || t.includes("randomised") || t.includes(" rct") || t.includes("controlled trial")) return "ensaio clínico randomizado";
-  if (t.includes("trial") || t.includes("clinical trial")) return "ensaio clínico randomizado";
-  if (t.includes("cohort") || t.includes("coorte") || t.includes("longitudinal") || t.includes("prospective")) return "coorte";
-  if (t.includes("case-control") || t.includes("case control")) return "estudo observacional";
-  if (t.includes("case report") || t.includes("case series") || t.includes("case study")) return "relato de caso";
-  if (t.includes("cross-section") || t.includes("cross section") || t.includes("survey") || t.includes("transversal")) return "estudo transversal";
-  if (t.includes("preprint") || t.includes("posted-content")) return "preprint";
-  // Artigo em periódico científico = publicação peer-reviewed (design desconhecido, mas validado)
-  if (t.includes("journalarticle") || t.includes("journal article") || t.includes("journal-article")) return "coorte";
-  return "estudo observacional";
+  if (t.includes("meta-analys") || t.includes("meta analys") || t.includes("metaanalys")) return { type: "meta-análise", inferred: false };
+  if ((t.includes("systematic") && t.includes("review")) || t.includes("cochrane")) return { type: "revisão sistemática", inferred: false };
+  if (t.includes("systematic")) return { type: "revisão sistemática", inferred: false };
+  if (t.includes("narrative review") || t.includes("literature review") || t.includes("scoping review")) return { type: "revisão narrativa", inferred: false };
+  if (t.includes("review")) return { type: "revisão sistemática", inferred: false };
+  if (t.includes("randomized") || t.includes("randomised") || t.includes(" rct") || t.includes("controlled trial")) return { type: "ensaio clínico randomizado", inferred: false };
+  if (t.includes("trial") || t.includes("clinical trial")) return { type: "ensaio clínico randomizado", inferred: false };
+  if (t.includes("cohort") || t.includes("coorte") || t.includes("longitudinal") || t.includes("prospective")) return { type: "coorte", inferred: false };
+  if (t.includes("case-control") || t.includes("case control")) return { type: "estudo observacional", inferred: false };
+  if (t.includes("case report") || t.includes("case series") || t.includes("case study")) return { type: "relato de caso", inferred: false };
+  if (t.includes("cross-section") || t.includes("cross section") || t.includes("survey") || t.includes("transversal")) return { type: "estudo transversal", inferred: false };
+  if (t.includes("preprint") || t.includes("posted-content")) return { type: "preprint", inferred: false };
+  // Tipo de publicação genérico — design metodológico desconhecido
+  if (t.includes("journalarticle") || t.includes("journal article") || t.includes("journal-article")) return { type: "estudo observacional", inferred: true };
+  return { type: "estudo observacional", inferred: true };
+}
+
+/** Convenience: returns just the study type string */
+function studyTypeStr(label: string): string {
+  return studyTypeFromLabel(label).type;
+}
+
+/** Returns spreadable props for buildArticle: { studyType, studyTypeInferred } */
+function studyTypeProps(label: string): { studyType: string; studyTypeInferred: boolean } {
+  const { type, inferred } = studyTypeFromLabel(label);
+  return { studyType: type, studyTypeInferred: inferred };
 }
 
 function evScoreFromStudyType(studyType: string): number {
@@ -102,19 +119,20 @@ function evScoreFromStudyType(studyType: string): number {
  * Programático — sem chamada de LLM.
  */
 function buildEvidenceReason(article: Article, query: string): string {
-  const queryLower = query.toLowerCase().replace(/[?!.]+$/, "").trim();
-
-  // Extrai até 2 frases úteis do abstract (ignora abstracts gerados/curtos)
   const abstract = article.abstract_pt?.trim() ?? "";
-  let abstractSnippet = "";
-  if (abstract.length > 80 && abstract !== "Abstract não disponível.") {
-    // Pega a primeira frase substantiva (>40 chars)
-    const sentences = abstract.split(/(?<=[.!?])\s+/);
-    const first = sentences.find((s) => s.length > 40);
-    if (first) abstractSnippet = first.replace(/\s+/g, " ").trim();
+
+  // Sem abstract real → não gera texto especulativo
+  if (abstract.length < 50 || abstract === "Abstract não disponível.") {
+    return "";
   }
 
-  // Monta a frase de relevância
+  const queryLower = query.toLowerCase().replace(/[?!.]+$/, "").trim();
+
+  // Extrai a primeira frase substantiva do abstract (>40 chars)
+  const sentences = abstract.split(/(?<=[.!?])\s+/);
+  const firstSentence = sentences.find((s) => s.length > 40);
+  const abstractSnippet = firstSentence ? firstSentence.replace(/\s+/g, " ").trim() : "";
+
   const studyLabel =
     article.study_type === "meta-análise" ? "Esta meta-análise" :
     article.study_type === "revisão sistemática" ? "Esta revisão sistemática" :
@@ -130,7 +148,7 @@ function buildEvidenceReason(article: Article, query: string): string {
     : "";
 
   const connector = abstractSnippet
-    ? `${studyLabel}${citNote} aborda diretamente o tema "${queryLower}". ${abstractSnippet}`
+    ? `${studyLabel}${citNote} aborda o tema "${queryLower}". ${abstractSnippet}`
     : `${studyLabel}${citNote} é relevante para a busca sobre "${queryLower}".`;
 
   return connector.length > 280 ? connector.slice(0, 280) + "…" : connector;
@@ -147,6 +165,7 @@ function buildArticle(p: {
   doi: string;
   abstract: string;
   studyType: string;
+  studyTypeInferred?: boolean;
   url?: string;
   language?: "pt" | "en" | "es";
 }): Article {
@@ -172,26 +191,44 @@ function buildArticle(p: {
     confidence_score: (() => {
       // evScore: 5=meta/rev.sist, 4=RCT, 3=coorte/observacional, 2=preprint, 1=fallback
       const studyW = evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 35 : 45;
-      const sourceW = 80; // domain_weight padrão para fontes da API
-      const peerW = evScore >= 3 ? 100 : 0;
-      const recencyW = p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40;
-      // citW: /2 em vez de /10 → 50 cits=25, 200 cits=100 (antes 50 cits=5)
+      const sourceW =
+        p.source === "Cochrane" ? 95 : p.source === "PubMed" ? 90 :
+        p.source === "Semantic Scholar" ? 88 : p.source === "Europe PMC" ? 82 :
+        p.source === "OpenAlex" ? 78 : p.source === "DOAJ" ? 75 :
+        p.source === "SciELO" ? 75 : p.source === "BVS/LILACS" ? 72 :
+        p.source === "CrossRef" ? 70 : p.source === "CORE" ? 65 :
+        p.source === "Lens.org" ? 65 : p.source === "BASE" ? 60 :
+        p.source === "arXiv" ? 58 : 70;
+      const peerW = evScore === 5 ? 100 : evScore === 4 ? 90 : evScore === 3 ? 70 : 0;
+      const recencyW = p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : p.year && p.year >= 2000 ? 40 : 20;
       const citW = Math.min(100, Math.floor(p.citations / 2));
-      // Pesos espelhados do frontend: Study(30%) Domain(25%) Peer(25%) Recency(15%) Cit(5%)
-      return Math.min(95, Math.max(30, Math.round(
+      const noAbstractPenalty = (!p.abstract || p.abstract.trim().length < 50) ? 10 : 0;
+      const noDoiPenalty = (!p.doi || p.doi === "n/a" || p.doi === "") ? 8 : 0;
+      const agePenalty = p.year && p.year < 1990 ? 15 : p.year && p.year < 2000 ? 8 : 0;
+      // Pesos: Study(30%) Source(25%) Peer(25%) Recency(15%) Cit(5%) − penalties
+      return Math.min(95, Math.max(25, Math.round(
         studyW * 0.30 + sourceW * 0.25 + peerW * 0.25 + recencyW * 0.15 + citW * 0.05
+        - noAbstractPenalty - noDoiPenalty - agePenalty
       )));
     })(),
     confidence_factors: {
-      domain_weight: 80,
+      domain_weight:
+        p.source === "Cochrane" ? 95 : p.source === "PubMed" ? 90 :
+        p.source === "Semantic Scholar" ? 88 : p.source === "Europe PMC" ? 82 :
+        p.source === "OpenAlex" ? 78 : p.source === "DOAJ" ? 75 :
+        p.source === "SciELO" ? 75 : p.source === "BVS/LILACS" ? 72 :
+        p.source === "CrossRef" ? 70 : p.source === "CORE" ? 65 :
+        p.source === "Lens.org" ? 65 : p.source === "BASE" ? 60 :
+        p.source === "arXiv" ? 58 : 70,
       peer_reviewed: evScore >= 3,
       study_type_weight: evScore === 5 ? 100 : evScore === 4 ? 75 : evScore === 3 ? 65 : evScore === 2 ? 35 : 45,
       recency_score:
-        p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : 40,
+        p.year && p.year >= 2022 ? 100 : p.year && p.year >= 2018 ? 80 : p.year && p.year >= 2013 ? 60 : p.year && p.year >= 2000 ? 40 : 20,
       citations_weight: Math.min(100, Math.floor(p.citations / 2)),
     },
     ...(p.url ? { url: p.url } : {}),
     ...(p.language ? { language: p.language } : {}),
+    ...(p.studyTypeInferred ? { study_type_inferred: true } : {}),
   };
 }
 
@@ -257,7 +294,6 @@ function mapOpenAlexWork(w: any): Article {
     .filter(Boolean)
     .join(", ");
   const doi = (w.doi ?? "").replace("https://doi.org/", "");
-  const studyType = studyTypeFromLabel(w.type ?? "");
   const oaUrl = w.open_access?.oa_url ?? (doi ? `https://doi.org/${doi}` : undefined);
   return buildArticle({
     title: w.title,
@@ -269,7 +305,7 @@ function mapOpenAlexWork(w: any): Article {
     is_oa: w.open_access?.is_oa ?? false,
     doi,
     abstract: reconstructAbstract(w.abstract_inverted_index),
-    studyType,
+    ...studyTypeProps(w.type ?? ""),
     url: oaUrl,
   });
 }
@@ -341,7 +377,6 @@ async function fetchCrossRef(query: string): Promise<Article[]> {
         ? item["container-title"][0]
         : (item["container-title"] ?? "");
       const doi = item.DOI ?? "";
-      const studyType = studyTypeFromLabel(item.type ?? "");
       // CrossRef returns JATS XML in abstract field for some journals
       const rawAbstract = item.abstract ?? "";
       const abstract = rawAbstract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -355,7 +390,7 @@ async function fetchCrossRef(query: string): Promise<Article[]> {
         is_oa: false,
         doi,
         abstract,
-        studyType,
+        ...studyTypeProps(item.type ?? ""),
         url: doi ? `https://doi.org/${doi}` : undefined,
       });
     });
@@ -396,7 +431,7 @@ async function fetchEuropePMC(query: string): Promise<Article[]> {
         is_oa: r.isOpenAccess === "Y",
         doi: r.doi ?? "",
         abstract: r.abstractText ?? "",
-        studyType: studyTypeFromLabel(r.pubType ?? ""),
+        ...studyTypeProps(r.pubType ?? ""),
         url: r.doi ? `https://doi.org/${r.doi}` : undefined,
       });
     });
@@ -429,7 +464,7 @@ async function fetchEuropePMCPT(query: string): Promise<Article[]> {
         is_oa: r.isOpenAccess === "Y",
         doi: r.doi ?? "",
         abstract: r.abstractText ?? "",
-        studyType: studyTypeFromLabel(r.pubType ?? ""),
+        ...studyTypeProps(r.pubType ?? ""),
         url: r.doi ? `https://doi.org/${r.doi}` : undefined,
         language: "pt",
       });
@@ -518,7 +553,7 @@ async function fetchPubMed(query: string): Promise<Article[]> {
         is_oa: false,
         doi,
         abstract: abstracts[id] ?? "",
-        studyType: studyTypeFromLabel(pubTypes || item.fulljournalname || ""),
+        ...studyTypeProps(pubTypes || item.fulljournalname || ""),
         url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
       });
     })
@@ -591,7 +626,7 @@ async function fetchPubMedPT(query: string): Promise<Article[]> {
         is_oa: false,
         doi,
         abstract: abstracts[id] ?? "",
-        studyType: studyTypeFromLabel(pubTypes || item.fulljournalname || ""),
+        ...studyTypeProps(pubTypes || item.fulljournalname || ""),
         url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
         language: "pt",
       });
@@ -672,7 +707,7 @@ async function fetchSemanticScholar(query: string): Promise<Article[]> {
         is_oa: p.isOpenAccess ?? false,
         doi,
         abstract: p.abstract ?? "",
-        studyType: studyTypeFromLabel(types),
+        ...studyTypeProps(types),
         url: doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${p.paperId}`,
       });
     });
@@ -719,7 +754,7 @@ async function fetchSemanticScholarPsych(query: string): Promise<Article[]> {
         is_oa: p.isOpenAccess ?? false,
         doi,
         abstract: p.abstract ?? "",
-        studyType: studyTypeFromLabel(types),
+        ...studyTypeProps(types),
         url: doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${p.paperId}`,
       });
     });
@@ -973,7 +1008,7 @@ async function fetchCORE(query: string): Promise<Article[]> {
         is_oa: true,
         doi,
         abstract: r.abstract ?? "",
-        studyType: studyTypeFromLabel(r.documentType ?? r.type ?? "journal-article"),
+        ...studyTypeProps(r.documentType ?? r.type ?? "journal-article"),
         url: doi ? `https://doi.org/${doi}` : (r.downloadUrl ?? undefined),
       });
     });
@@ -1020,7 +1055,7 @@ async function fetchLensOrg(query: string): Promise<Article[]> {
         is_oa: r.open_access?.is_oa ?? false,
         doi,
         abstract: r.abstract ?? "",
-        studyType: studyTypeFromLabel(r.doc_type ?? r.publication_type ?? "journal-article"),
+        ...studyTypeProps(r.doc_type ?? r.publication_type ?? "journal-article"),
         url: doi ? `https://doi.org/${doi}` : undefined,
       });
     });
@@ -1134,6 +1169,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     a.evidence_reason = buildEvidenceReason(a, q);
   }
 
+  // Pre-calculate raw relevance scores for normalization
+  const rawScores = unique.map((a) => relevanceScore(a, queryTerms));
+  const maxRaw = Math.max(...rawScores, 1);
+
   unique.sort((a, b) => {
     // PT boost forte — artigos em PT sobem significativamente
     const ptBoostA = a.language === "pt" ? 12 : 0;
@@ -1149,6 +1188,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (Math.abs(scoreB - scoreA) > 0.1) return scoreB - scoreA;
     return b.citations - a.citations;
   });
+
+  // Tag relevance_score (0-100) and low_relevance after sort
+  const LOW_RELEVANCE_THRESHOLD = 0.10;
+  for (let i = 0; i < unique.length; i++) {
+    const normalizedScore = rawScores[i] / maxRaw;
+    unique[i].relevance_score = Math.round(normalizedScore * 100);
+    if (normalizedScore < LOW_RELEVANCE_THRESHOLD) {
+      unique[i].low_relevance = true;
+      console.log(`[search] low_relevance: "${unique[i].title.slice(0, 60)}" score=${normalizedScore.toFixed(3)}`);
+    }
+  }
 
   const sources = [...new Set(unique.map((a) => a.source))];
   return res.status(200).json({ count: unique.length, articles: unique, isPsych, sources });
