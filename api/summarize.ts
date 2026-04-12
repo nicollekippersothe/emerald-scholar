@@ -375,20 +375,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // ── Enriquecimento de texto completo (paralelo, silent fallback) ──────────
-    console.log(`[api/summarize] enriquecendo ${rawArticles.length} artigos com texto completo...`);
-    const fullTexts = await batchGetFullText(rawArticles);
-    const articles: EnrichedArticle[] = rawArticles.map((a, i) => {
-      const ft: FullTextResult = fullTexts[i];
-      return {
+    let articles: EnrichedArticle[];
+    try {
+      console.log(`[api/summarize] enriquecendo ${rawArticles.length} artigos com texto completo...`);
+      const fullTexts = await batchGetFullText(rawArticles);
+      articles = rawArticles.map((a, i) => {
+        const ft: FullTextResult = fullTexts[i];
+        return {
+          ...a,
+          _full_text: ft.source === "full_text" ? ft.text : undefined,
+          _text_source: ft.source,
+          _text_provider: ft.provider,
+          icm_source: ft.source,
+        };
+      });
+      const fullTextCount = articles.filter(a => a._text_source === "full_text").length;
+      console.log(`[api/summarize] texto completo obtido para ${fullTextCount}/${rawArticles.length} artigos`);
+    } catch (enrichErr) {
+      // Qualquer falha no enriquecimento → prossegue apenas com abstract (nunca trava a síntese)
+      console.warn("[api/summarize] enriquecimento falhou, usando abstracts:", enrichErr);
+      articles = rawArticles.map((a) => ({
         ...a,
-        _full_text: ft.source === "full_text" ? ft.text : undefined,
-        _text_source: ft.source,
-        _text_provider: ft.provider,
-        icm_source: ft.source,
-      };
-    });
-    const fullTextCount = articles.filter(a => a._text_source === "full_text").length;
-    console.log(`[api/summarize] texto completo obtido para ${fullTextCount}/${rawArticles.length} artigos`);
+        _full_text: undefined,
+        _text_source: "abstract" as const,
+        _text_provider: "abstract",
+        icm_source: "abstract" as const,
+      }));
+    }
 
     const computedICM = computeICM(articles);
     const prompt = buildUserPrompt(query, articles, computedICM);

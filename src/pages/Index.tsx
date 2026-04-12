@@ -256,22 +256,23 @@ function HeroSection({ query, setQuery, handleSubmit, handleSearch, loading, sea
             </div>
           </div>
 
-          {/* ── Sugestões / Buscas recentes ── */}
-          <div className="hero-in-fade hero-d5 flex flex-col items-center gap-2 w-full max-w-3xl">
+          {/* ── Principais buscas / Buscas recentes ── */}
+          <div className="hero-in-fade hero-d5 flex flex-col items-center gap-3 w-full max-w-3xl">
             <div className="flex items-center justify-between w-full px-1">
-              <span className="text-[10px] font-semibold text-muted-foreground/45 uppercase tracking-wider flex items-center gap-1">
-                {recents.length > 0 ? <><Clock size={9} /> Buscas recentes</> : <><Sparkles size={9} /> Sugestões</>}
+              <span className="text-[10px] font-bold text-muted-foreground/55 uppercase tracking-wider flex items-center gap-1.5">
+                {recents.length > 0 ? <><Clock size={9} /> Buscas recentes</> : <><Sparkles size={9} /> Principais buscas</>}
               </span>
               {recents.length > 0 && (
-                <button onClick={clearRecents} className="text-[10px] text-muted-foreground/35 hover:text-muted-foreground transition-colors">
+                <button onClick={clearRecents} className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors">
                   limpar
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
               {(recents.length > 0 ? recents : QUICK_SEARCHES).map((search) => (
                 <button key={search} onClick={() => handleSearch(search)}
-                  className="bg-card/40 border border-foreground/8 hover:border-primary/35 hover:bg-primary/5 px-3 py-1.5 rounded-full text-[11px] text-foreground/50 hover:text-foreground/80 transition-all">
+                  className="bg-card/60 border border-foreground/10 hover:border-primary/40 hover:bg-primary/5 px-3 py-2.5 rounded-xl text-[11px] text-foreground/65 hover:text-foreground transition-all text-left leading-snug">
+                  <Search size={10} className="inline mr-1.5 text-primary/50 shrink-0" />
                   {search}
                 </button>
               ))}
