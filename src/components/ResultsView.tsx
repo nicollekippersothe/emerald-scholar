@@ -34,7 +34,6 @@ import FeedbackModal from "@/components/FeedbackModal";
 import DevModal from "@/components/DevModal";
 import PromoCodeModal from "@/components/PromoCodeModal";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
-import { calculateConfidenceScore } from "@/lib/confidenceScore";
 import SynthesisPanel from "@/components/SynthesisPanel";
 import { useQueryIntention } from "@/hooks/useQueryIntention";
 import { type MockEntry, type Article, type ArticleSummary, STUDY_TYPE_MAP, EVIDENCE_LABELS, SOURCE_LIST } from "@/data/mockDatabase";
@@ -75,7 +74,7 @@ interface ResultsViewProps {
   searchesLeft: number;
   onQueryChange: (q: string) => void;
   onSubmit: (e: FormEvent) => void;
-  onSearch: (term: string, options?: { lang?: string }) => void;
+  onSearch: (term: string, options?: { lang?: string; allYears?: boolean }) => void;
   onBack: () => void;
   synthesisLoading?: boolean;
   synthesisFailed?: boolean;
@@ -83,6 +82,10 @@ interface ResultsViewProps {
   onToggleTheme?: () => void;
   /** Fontes reais que retornaram resultados (vindo da API) */
   realSources?: string[];
+  /** Artigos anteriores ao filtro de data ocultados pelo backend */
+  hiddenByYear?: { count: number; yearFrom: number } | null;
+  /** Callback para refazer a busca sem filtro de data */
+  onShowAllYears?: () => void;
 }
 
 /* ── Hallucination-filtered chat answer ── */
@@ -361,10 +364,7 @@ const ArticleCard = memo(({ article, onSave, saved, resumoPt, articleSummary, qu
         >
           <ScoreDots score={article.evidence_score} />
         </div>
-        {(() => {
-          const computed = calculateConfidenceScore(article.study_type, article.source, article.journal, article.year, article.citations, article.expert_reviewed);
-          return <ConfidenceBadge score={computed.score} factors={computed.factors} />;
-        })()}
+        <ConfidenceBadge score={article.confidence_score} factors={article.confidence_factors} />
       </div>
 
       {/* Why this score */}
@@ -1150,6 +1150,8 @@ const ResultsView = ({
   theme,
   onToggleTheme,
   realSources,
+  hiddenByYear,
+  onShowAllYears,
 }: ResultsViewProps) => {
   const queryIntention = useQueryIntention(query);
   const [activeTab, setActiveTab] = useState("search");
@@ -1611,6 +1613,23 @@ const ResultsView = ({
                 </button>
               ))}
             </div>
+
+            {/* BANNER: filtro de data */}
+            {hiddenByYear && hiddenByYear.count > 0 && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-muted/40 border border-foreground/10 text-xs text-muted-foreground">
+                <span>
+                  {hiddenByYear.count} artigo{hiddenByYear.count !== 1 ? "s" : ""} anterior{hiddenByYear.count !== 1 ? "es" : ""} a {hiddenByYear.yearFrom} oculto{hiddenByYear.count !== 1 ? "s" : ""} — exibindo últimos 10 anos.
+                </span>
+                {onShowAllYears && (
+                  <button
+                    onClick={onShowAllYears}
+                    className="ml-auto shrink-0 text-primary hover:underline font-medium whitespace-nowrap"
+                  >
+                    Ver todos os anos
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* FILTERS */}
             <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">

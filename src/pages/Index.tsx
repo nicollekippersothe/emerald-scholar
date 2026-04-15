@@ -418,6 +418,8 @@ const Index = () => {
   const [synthesisFailed, setSynthesisFailed] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [realSources, setRealSources] = useState<string[] | undefined>(undefined);
+  const [hiddenByYear, setHiddenByYear] = useState<{ count: number; yearFrom: number } | null>(null);
+  const [currentSearchTerm, setCurrentSearchTerm] = useState<string>("");
 
   const { user, signOut, decrementSearch } = useAuth();
   const { push: pushRecent } = useRecentSearches();
@@ -425,7 +427,7 @@ const Index = () => {
   // searchesLeft: use Supabase user when available, localStorage otherwise
   const searchesLeft = user?.searchesLeft ?? getLocalSearchesLeftPublic();
 
-  const handleSearch = async (searchTerm: string, options?: { lang?: string }) => {
+  const handleSearch = async (searchTerm: string, options?: { lang?: string; allYears?: boolean }) => {
     if (!searchTerm.trim()) return;
 
     // Gate: check remaining searches before consuming
@@ -446,16 +448,24 @@ const Index = () => {
     setResult(null);
     setSearchError(null);
     setQuery(searchTerm);
+    setHiddenByYear(null);
+    setCurrentSearchTerm(searchTerm);
 
     try {
       // Fase 1: Busca artigos (rápido — Semantic Scholar)
       const langParam = options?.lang ? `&lang=${encodeURIComponent(options.lang)}` : "";
-      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}${langParam}`);
+      const allYearsParam = options?.allYears ? "&all_years=1" : "";
+      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}${langParam}${allYearsParam}`);
 
       if (!searchRes.ok) throw new Error("API de busca indisponível");
 
-      const { count, articles, sources } = await searchRes.json();
+      const { count, articles, sources, hidden_by_year_count, year_from } = await searchRes.json();
       if (Array.isArray(sources)) setRealSources(sources);
+      if (hidden_by_year_count > 0) {
+        setHiddenByYear({ count: hidden_by_year_count, yearFrom: year_from });
+      } else {
+        setHiddenByYear(null);
+      }
 
       // ICM provisório calculado localmente enquanto a síntese IA carrega
       const STUDY_SCORES: Record<string, number> = {
@@ -468,10 +478,10 @@ const Index = () => {
         "OpenAlex": 80, "CrossRef": 80, "DOAJ": 75, "SciELO": 75,
         "Europe PMC": 75, "BVS/LILACS": 70, "CORE": 70, "BASE": 65, "arXiv": 55,
       };
-      const top8 = (articles as { study_type: string; source: string; citations: number; year: string }[]).slice(0, 8);
-      const provisionalICM = top8.length > 0
+      const top5 = (articles as { study_type: string; source: string; citations: number; year: string }[]).slice(0, 5);
+      const provisionalICM = top5.length > 0
         ? (() => {
-            const base = top8.reduce((sum, a) => {
+            const base = top5.reduce((sum, a) => {
               const ts = STUDY_SCORES[a.study_type] ?? 50;
               const ss = SOURCE_SCORES[a.source] ?? 65;
               const pb = ts >= 65 ? 10 : 0;
@@ -479,8 +489,8 @@ const Index = () => {
               const yr = parseInt(a.year) || 2000;
               const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
               return sum + ts * 0.35 + ss * 0.25 + pb * 0.20 + citW * 0.15 + yearW * 0.05;
-            }, 0) / top8.length;
-            const uniqueSources = new Set(top8.map(a => a.source)).size;
+            }, 0) / top5.length;
+            const uniqueSources = new Set(top5.map(a => a.source)).size;
             const diversityBonus = Math.min(15, (uniqueSources - 1) * 4);
             return Math.min(95, Math.max(30, Math.round(base + diversityBonus)));
           })()
@@ -496,7 +506,7 @@ const Index = () => {
           consensus_agree: 0,
           consensus_inconclusive: 100,
           consensus_contradict: 0,
-          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 55 ? "média" : "limitada",
+          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 50 ? "média" : "limitada",
           confidence_score: provisionalICM,
           confidence_reasons: [],
           inconclusive_summary: "",
@@ -543,7 +553,7 @@ const Index = () => {
           consensus_agree: 0,
           consensus_inconclusive: 100,
           consensus_contradict: 0,
-          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 55 ? "média" : "limitada",
+          confidence_level: provisionalICM >= 70 ? "alta" : provisionalICM >= 50 ? "média" : "limitada",
           confidence_score: provisionalICM,
           confidence_reasons: [],
           inconclusive_summary: "",
@@ -558,8 +568,17 @@ const Index = () => {
       setResult((prev) => prev ? { ...prev, synthesis } : prev);
     } catch (err) {
       console.warn("[handleSearch] API indisponível:", err);
-      setLoading(false);
-      setSearchError("Não foi possível conectar à base de dados. Verifique sua conexão e tente novamente.");
+      // Se já temos resultados (phase 1 ok, phase 2 falhou), marca síntese como falha
+      // em vez de mostrar erro de busca
+      setResult((prev) => {
+        if (prev) {
+          setSynthesisFailed(true);
+          return prev;
+        }
+        setSearchError("Não foi possível conectar à base de dados. Verifique sua conexão e tente novamente.");
+        setLoading(false);
+        return null;
+      });
     } finally {
       setSynthesisLoading(false);
       await decrementSearch();
@@ -594,6 +613,8 @@ const Index = () => {
         theme={theme}
         onToggleTheme={toggleTheme}
         realSources={realSources}
+        hiddenByYear={hiddenByYear}
+        onShowAllYears={() => handleSearch(currentSearchTerm, { allYears: true })}
       />
     );
   }

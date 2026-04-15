@@ -46,6 +46,8 @@ interface ArticleInput {
   journal?: string;
   /** TL;DR do Semantic Scholar — resumo de 1-2 frases baseado no paper real */
   tldr?: string;
+  /** Pré-calculado pelo search.ts (inclui penalidades de abstract, DOI, idade) */
+  confidence_score?: number;
 }
 
 /** ArticleInput enriched with full-text metadata before sending to the LLM */
@@ -121,31 +123,41 @@ function fullTextQualityBonus(text: string): number {
 
 function computeICM(articles: EnrichedArticle[]): number {
   if (articles.length === 0) return 50;
-  const top = articles.slice(0, 8);
+  const top = articles.slice(0, 5);
+
+  // Usa confidence_score pré-calculado por artigo (search.ts) quando disponível —
+  // já inclui penalidades de sem-abstract, sem-DOI, idade e citações reais.
+  // Fallback para a fórmula local se o campo não vier (retrocompatibilidade).
   const baseScore = top.reduce((sum, a) => {
-    const ts = STUDY_SCORES[a.study_type] ?? 50;
-    const ss = SOURCE_SCORES[a.source] ?? 65;
-    const peerBonus = ts >= 65 ? 10 : 0;
-    // Citações: paper com 200+ cit. recebe pontuação máxima (200 → 100pts)
-    const citW = Math.min(100, Math.floor(a.citations / 2));
-    // Recência: publicações recentes têm mais impacto
-    const yr = parseInt(a.year) || 2000;
-    const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
-    // Full-text quality bonus (0–10 pts based on methodological signals in the text)
-    const ftBonus = a._text_source === "full_text" ? fullTextQualityBonus(a._full_text ?? "") : 0;
-    // Pesos: Tipo(35%) Fonte(25%) PeerReview(20%) Citações(15%) Recência(5%)
-    return sum + ts * 0.35 + ss * 0.25 + peerBonus * 0.20 + citW * 0.15 + yearW * 0.05 + ftBonus;
+    let score: number;
+    if (typeof a.confidence_score === "number" && a.confidence_score >= 25) {
+      // Full-text bonus adicional (até +8): text real > abstract melhora o ICM
+      const ftBonus = a._text_source === "full_text" ? Math.min(8, fullTextQualityBonus(a._full_text ?? "")) : 0;
+      score = Math.min(95, a.confidence_score + ftBonus);
+    } else {
+      // Fallback: fórmula local
+      const ts = STUDY_SCORES[a.study_type] ?? 50;
+      const ss = SOURCE_SCORES[a.source] ?? 65;
+      const peerBonus = ts >= 65 ? 10 : 0;
+      const citW = Math.min(100, Math.floor(a.citations / 2));
+      const yr = parseInt(a.year) || 2000;
+      const yearW = yr >= 2023 ? 100 : yr >= 2020 ? 90 : yr >= 2018 ? 80 : yr >= 2015 ? 60 : yr >= 2010 ? 40 : 20;
+      const ftBonus = a._text_source === "full_text" ? fullTextQualityBonus(a._full_text ?? "") : 0;
+      score = ts * 0.35 + ss * 0.25 + peerBonus * 0.20 + citW * 0.15 + yearW * 0.05 + ftBonus;
+    }
+    return sum + score;
   }, 0) / top.length;
-  // Bônus de diversidade: mais bases consultadas = evidência mais ampla (max +15)
+
+  // Bônus de diversidade: mais bases consultadas = evidência mais ampla (max +12)
   const uniqueSources = new Set(top.map(a => a.source)).size;
-  const diversityBonus = Math.min(15, (uniqueSources - 1) * 4);
+  const diversityBonus = Math.min(12, (uniqueSources - 1) * 3);
   return Math.min(95, Math.max(30, Math.round(baseScore + diversityBonus)));
 }
 
 function icmLabel(score: number): string {
   if (score >= 85) return "muito alta";
   if (score >= 70) return "alta";
-  if (score >= 55) return "média";
+  if (score >= 50) return "média";
   return "limitada";
 }
 
@@ -246,6 +258,7 @@ async function callGroq(prompt: string): Promise<string> {
       },
       body: JSON.stringify({
         model,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: prompt },
@@ -333,7 +346,7 @@ async function callOpenRouter(prompt: string): Promise<string> {
     });
 
     if (res.status === 429 || res.status === 400 || res.status === 404) {
-      const errText = await res.text();
+      await res.text(); // drena o body
       console.warn(`[api/summarize] OpenRouter ${model} indisponível (${res.status})`);
       lastError = `${res.status}`;
       continue;

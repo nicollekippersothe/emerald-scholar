@@ -3,9 +3,53 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const MAILTO = "contact@scholaria.app";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// ─── Query expansion: PT → EN keywords via Groq ───────────────────────────────
-async function expandQueryToEnglish(query: string): Promise<string> {
-  if (!GROQ_API_KEY) return query;
+// ─── Query expansion: PT → structured { pt[], en[], short } via Groq ─────────
+
+interface QueryExpansion {
+  pt: string[];    // 3 variações em português
+  en: string[];    // 3 variações em inglês com termos MeSH quando aplicável
+  short: string;   // query curta em inglês (2-4 termos)
+}
+
+function parseExpansionJson(raw: string): QueryExpansion | null {
+  // 1. Tenta direto
+  try {
+    const parsed = JSON.parse(raw);
+    if (isValidExpansion(parsed)) return parsed;
+  } catch {}
+  // 2. Remove ```json ... ``` ou ``` ... ```
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  try {
+    const parsed = JSON.parse(stripped);
+    if (isValidExpansion(parsed)) return parsed;
+  } catch {}
+  // 3. Extrai o primeiro objeto JSON da string
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[0]);
+      if (isValidExpansion(parsed)) return parsed;
+    } catch {}
+  }
+  return null;
+}
+
+function isValidExpansion(obj: unknown): obj is QueryExpansion {
+  if (!obj || typeof obj !== "object") return false;
+  const o = obj as Record<string, unknown>;
+  return (
+    Array.isArray(o.pt) && o.pt.length >= 1 &&
+    Array.isArray(o.en) && o.en.length >= 1 &&
+    typeof o.short === "string" && o.short.length > 0
+  );
+}
+
+function fallbackExpansion(query: string): QueryExpansion {
+  return { pt: [query], en: [query], short: query };
+}
+
+async function expandQuery(query: string): Promise<QueryExpansion> {
+  if (!GROQ_API_KEY) return fallbackExpansion(query);
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -15,30 +59,32 @@ async function expandQueryToEnglish(query: string): Promise<string> {
       },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              "You are a biomedical search expert. Extract 3-5 precise English MeSH/academic keywords from the user's query. Reply with ONLY the keywords joined by ' AND ', nothing else. No explanation.",
+              'You are a biomedical search expert. Given an academic query (possibly in Portuguese), return a JSON object with exactly these fields:\n- "pt": array of 3 Portuguese alternative formulations (synonyms, related terms, different phrasings)\n- "en": array of 3 English formulations using MeSH terms when applicable\n- "short": one short English query with 2-4 key terms (max 6 words)\n\nReturn ONLY valid JSON, no explanation, no markdown.',
           },
           { role: "user", content: query },
         ],
         temperature: 0,
-        max_tokens: 40,
+        max_tokens: 200,
       }),
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return query;
+    if (!res.ok) return fallbackExpansion(query);
     const data = await res.json() as { choices: { message: { content: string } }[] };
-    const keywords = data.choices?.[0]?.message?.content?.trim();
-    if (keywords && keywords.length > 3) {
-      console.log(`[api/search] query expandida: "${keywords}"`);
-      return keywords;
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const parsed = parseExpansionJson(raw);
+    if (parsed) {
+      console.log(`[api/search] expansão: pt=[${parsed.pt[0]}] en=[${parsed.en[0]}] short="${parsed.short}"`);
+      return parsed;
     }
   } catch (e) {
-    console.warn("[api/search] expansão de query falhou, usando original:", e);
+    console.warn("[api/search] expansão de query falhou, usando fallback:", e);
   }
-  return query;
+  return fallbackExpansion(query);
 }
 
 // ─── Shared article shape ─────────────────────────────────────────────────────
@@ -1090,72 +1136,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const q = req.query.q as string;
-  const lang = (req.query.lang as string) ?? "";
+  const allYears = req.query.all_years === "1";
   if (!q?.trim()) return res.status(400).json({ error: "query obrigatória" });
 
-  // Expand PT query → EN keywords for broader EN-language coverage
-  console.log(`[api/search] query="${q}" lang="${lang}" psych=${isPsychQuery(q)}`);
-  const expandedQuery = await expandQueryToEnglish(q);
-  const langHint =
-    lang.includes("pt") || lang.includes("es")
-      ? " (Portuguese OR Spanish OR Brasil)"
-      : "";
-  const finalQuery = expandedQuery + langHint;
-
-
   const isPsych = isPsychQuery(q);
+  console.log(`[api/search] query="${q}" psych=${isPsych} all_years=${allYears}`);
 
-  // Run all sources in parallel:
-  // - EN sources use the expanded query for broader coverage
-  // - PT sources use the original query + language filter for precision
-  // - Psychology queries get extra psych-specific sources
+  // Etapa 1 — Expansão semântica estruturada
+  const expansion = await expandQuery(q);
+  const en0 = expansion.en[0] ?? q;
+  const en1 = expansion.en[1] ?? en0;
+  const en2 = expansion.en[2] ?? en0;
+  const pt0 = expansion.pt[0] ?? q;
+  const short = expansion.short ?? q;
+
+  // Etapa 2 — Dispatch por base:
+  //   PT bases  (SciELO, BVS, PubMed-PT, DOAJ) → pt[0] ou q original
+  //   EN bases  (PubMed, CrossRef, EuropePMC)  → en[0]  (termos MeSH)
+  //   Multi     (OpenAlex, S2)                 → en[0..2] em paralelo
+  //   Simple    (CORE, Lens.org, PsyArXiv)     → short
   const results = await Promise.allSettled([
-    fetchOpenAlex(finalQuery),
-    fetchOpenAlexPT(q),                                        // SciELO, BVS-LILACS via OpenAlex language:pt
-    fetchCrossRef(finalQuery),
-    fetchEuropePMC(finalQuery),
-    fetchEuropePMCPT(q),                                       // EuropePMC LANG:por OR LANG:spa
-    fetchSemanticScholar(finalQuery),
-    fetchPubMed(finalQuery),
-    fetchPubMedPT(q),                                          // PubMed Portuguese[Language]
-    fetchDOAJ(q),                                              // DOAJ (cobre revistas abertas BR)
-    fetchCORE(finalQuery),                                     // CORE (open access repository)
-    fetchLensOrg(finalQuery),                                  // Lens.org scholarly search
+    // OpenAlex — 3 variações EN em paralelo + 1 filtro PT
+    fetchOpenAlex(en0),
+    fetchOpenAlex(en1),
+    fetchOpenAlex(en2),
+    fetchOpenAlexPT(q),                       // language:pt — SciELO, BVS-LILACS
+    // Semantic Scholar — 3 variações EN em paralelo
+    fetchSemanticScholar(en0),
+    fetchSemanticScholar(en1),
+    fetchSemanticScholar(en2),
+    // Bases EN com MeSH
+    fetchPubMed(en0),
+    fetchEuropePMC(en0),
+    fetchCrossRef(en0),
+    // Bases PT
+    fetchPubMedPT(pt0),                       // Portuguese[Language]
+    fetchEuropePMCPT(pt0),                    // LANG:por OR LANG:spa
+    fetchDOAJ(pt0),                           // revistas abertas PT/BR
+    // Bases simples — query curta
+    fetchCORE(short),
+    fetchLensOrg(short),
+    // Psicologia
     ...(isPsych ? [
-      fetchSemanticScholarPsych(q),                            // S2 fieldsOfStudy=Psychology
-      fetchOpenAlexPsych(q),                                   // OpenAlex concepts.id=C15744967
-      fetchPsyArXiv(q),                                        // PsyArXiv preprints
+      fetchSemanticScholarPsych(en0),         // S2 fieldsOfStudy=Psychology
+      fetchOpenAlexPsych(q),                  // OpenAlex concepts.id=C15744967
+      fetchPsyArXiv(short),                   // PsyArXiv preprints
     ] : []),
   ]);
 
   const articles: Article[] = [];
   for (const r of results) {
-    if (r.status === "fulfilled") {
-      articles.push(...r.value);
-    } else {
-      console.error("[api/search] source error:", r.reason);
-    }
+    if (r.status === "fulfilled") articles.push(...r.value);
+    else console.error("[api/search] source error:", r.reason);
   }
 
   if (articles.length === 0) {
     return res.status(502).json({ error: "Nenhuma fonte retornou resultados" });
   }
 
-  // Dedupe first (keeps first occurrence — sources with abstracts are pushed first)
+  // Dedupe (mantém primeira ocorrência — fontes com abstract têm prioridade)
   const unique = dedupe(articles);
 
-  // Enrich articles missing abstracts: try S2 batch, then Groq contextualizado à query
-  // Enrich em paralelo: abstracts e citation counts (PubMed retorna 0 citações)
+  // Enrich em paralelo: abstracts (S2+Groq) e citation counts (PubMed retorna 0)
   await Promise.all([
     enrichMissingAbstracts(unique, q),
     enrichCitationsFromS2(unique),
   ]);
-
-  // Sort: relevância + boost PT (se busca PT) + confiabilidade + citações
-  const queryTerms = q
-    .toLowerCase()
-    .split(/[\s,?!.]+/)
-    .filter((t) => t.length > 3);
 
   // Auto-tag PT para fontes que publicam primariamente em português
   for (const a of unique) {
@@ -1169,37 +1215,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     a.evidence_reason = buildEvidenceReason(a, q);
   }
 
-  // Pre-calculate raw relevance scores for normalization
+  // Etapa 4 — Reranking: calcula rawScores ANTES do sort para usar no sort e na tag
+  const queryTerms = q
+    .toLowerCase()
+    .split(/[\s,?!.]+/)
+    .filter((t) => t.length > 3);
+
   const rawScores = unique.map((a) => relevanceScore(a, queryTerms));
   const maxRaw = Math.max(...rawScores, 1);
+  // Índice para acesso O(1) no sort
+  const scoreIdx = new Map(unique.map((a, i) => [a, rawScores[i]]));
 
   unique.sort((a, b) => {
-    // PT boost forte — artigos em PT sobem significativamente
-    const ptBoostA = a.language === "pt" ? 12 : 0;
-    const ptBoostB = b.language === "pt" ? 12 : 0;
-    // Relevância: maior peso — título vale 3, abstract vale 1 por termo
-    const relA = relevanceScore(a, queryTerms) * 2;
-    const relB = relevanceScore(b, queryTerms) * 2;
-    // Confidence boost: normaliza 40-95 → 0-3 pontos adicionais
-    const confBoostA = (a.confidence_score - 40) / 18.3;
-    const confBoostB = (b.confidence_score - 40) / 18.3;
-    const scoreA = relA + ptBoostA + confBoostA;
-    const scoreB = relB + ptBoostB + confBoostB;
+    const rawA = scoreIdx.get(a) ?? 0;
+    const rawB = scoreIdx.get(b) ?? 0;
+    const normA = rawA / maxRaw;
+    const normB = rawB / maxRaw;
+
+    // low_relevance → fundo da lista
+    const lowA = normA < 0.10 ? 1 : 0;
+    const lowB = normB < 0.10 ? 1 : 0;
+    if (lowA !== lowB) return lowA - lowB;
+
+    // PT com relevância alta → 1.4× (vantagem competitiva da Clara)
+    const ptMultA = (a.language === "pt" && rawA > 0) ? 1.4 : 1.0;
+    const ptMultB = (b.language === "pt" && rawB > 0) ? 1.4 : 1.0;
+    const relA = rawA * 2 * ptMultA;
+    const relB = rawB * 2 * ptMultB;
+
+    // Confidence boost: normaliza 25-95 → 0-3 pontos adicionais
+    const confBoostA = (a.confidence_score - 25) / 23.3;
+    const confBoostB = (b.confidence_score - 25) / 23.3;
+
+    const scoreA = relA + confBoostA;
+    const scoreB = relB + confBoostB;
     if (Math.abs(scoreB - scoreA) > 0.1) return scoreB - scoreA;
     return b.citations - a.citations;
   });
 
-  // Tag relevance_score (0-100) and low_relevance after sort
+  // Tag relevance_score (0-100) e low_relevance (índice pré-sort era por posição; recomputa por artigo)
   const LOW_RELEVANCE_THRESHOLD = 0.10;
-  for (let i = 0; i < unique.length; i++) {
-    const normalizedScore = rawScores[i] / maxRaw;
-    unique[i].relevance_score = Math.round(normalizedScore * 100);
-    if (normalizedScore < LOW_RELEVANCE_THRESHOLD) {
-      unique[i].low_relevance = true;
-      console.log(`[search] low_relevance: "${unique[i].title.slice(0, 60)}" score=${normalizedScore.toFixed(3)}`);
+  for (const a of unique) {
+    const raw = scoreIdx.get(a) ?? 0;
+    const norm = raw / maxRaw;
+    a.relevance_score = Math.round(norm * 100);
+    if (norm < LOW_RELEVANCE_THRESHOLD) {
+      a.low_relevance = true;
+      console.log(`[search] low_relevance: "${a.title.slice(0, 60)}" score=${norm.toFixed(3)}`);
     }
   }
 
-  const sources = [...new Set(unique.map((a) => a.source))];
-  return res.status(200).json({ count: unique.length, articles: unique, isPsych, sources });
+  // Etapa 3 — Filtro de data (pós-agregação para contar artigos ocultados com precisão)
+  const FROM_YEAR = new Date().getFullYear() - 10;
+  let hiddenByYearCount = 0;
+  let articlesToReturn = unique;
+  if (!allYears) {
+    articlesToReturn = unique.filter((a) => {
+      const yr = parseInt(a.year);
+      if (!yr || yr >= FROM_YEAR) return true;
+      hiddenByYearCount++;
+      return false;
+    });
+  }
+
+  const sources = [...new Set(articlesToReturn.map((a) => a.source))];
+  return res.status(200).json({
+    count: articlesToReturn.length,
+    articles: articlesToReturn,
+    isPsych,
+    sources,
+    ...(hiddenByYearCount > 0 ? { hidden_by_year_count: hiddenByYearCount, year_from: FROM_YEAR } : {}),
+  });
 }
