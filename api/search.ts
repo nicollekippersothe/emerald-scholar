@@ -87,6 +87,32 @@ async function expandQuery(query: string): Promise<QueryExpansion> {
   return fallbackExpansion(query);
 }
 
+// ─── DOI cleanup ─────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza um DOI bruto para o formato limpo "10.xxxx/yyyy".
+ * Remove prefixos de URL, sufixos "[doi]" e outros artefatos de APIs.
+ * Retorna string vazia se o resultado não parecer um DOI válido.
+ */
+function cleanDoi(raw: string | null | undefined): string {
+  if (!raw) return "";
+  let d = raw.trim();
+  // Remove prefixos de URL (https://doi.org/, http://dx.doi.org/, etc.)
+  d = d.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+  // Remove prefixo textual "doi: " ou "DOI:" (case-insensitive)
+  d = d.replace(/^doi:\s*/i, "");
+  // PubMed elocationid: "10.1000/xyz [doi]" ou "S123 [pii] 10.1000/xyz [doi]"
+  // Extrai o DOI marcado com [doi] se existir
+  const doiTagMatch = d.match(/(\S+)\s*\[doi\]/i);
+  if (doiTagMatch) {
+    d = doiTagMatch[1];
+  }
+  d = d.trim();
+  // Valida: DOI real começa com "10." seguido de 4+ dígitos e uma barra
+  if (!/^10\.\d{4,}\/\S+/.test(d)) return "";
+  return d;
+}
+
 // ─── Shared article shape ─────────────────────────────────────────────────────
 
 interface Article {
@@ -140,11 +166,6 @@ function studyTypeFromLabel(label: string): { type: string; inferred: boolean } 
   // Tipo de publicação genérico — design metodológico desconhecido
   if (t.includes("journalarticle") || t.includes("journal article") || t.includes("journal-article")) return { type: "estudo observacional", inferred: true };
   return { type: "estudo observacional", inferred: true };
-}
-
-/** Convenience: returns just the study type string */
-function studyTypeStr(label: string): string {
-  return studyTypeFromLabel(label).type;
 }
 
 /** Returns spreadable props for buildArticle: { studyType, studyTypeInferred } */
@@ -339,7 +360,7 @@ function mapOpenAlexWork(w: any): Article {
     .map((a: any) => a.author?.display_name ?? "")
     .filter(Boolean)
     .join(", ");
-  const doi = (w.doi ?? "").replace("https://doi.org/", "");
+  const doi = cleanDoi(w.doi);
   const oaUrl = w.open_access?.oa_url ?? (doi ? `https://doi.org/${doi}` : undefined);
   return buildArticle({
     title: w.title,
@@ -422,7 +443,7 @@ async function fetchCrossRef(query: string): Promise<Article[]> {
       const journal = Array.isArray(item["container-title"])
         ? item["container-title"][0]
         : (item["container-title"] ?? "");
-      const doi = item.DOI ?? "";
+      const doi = cleanDoi(item.DOI);
       // CrossRef returns JATS XML in abstract field for some journals
       const rawAbstract = item.abstract ?? "";
       const abstract = rawAbstract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -475,7 +496,7 @@ async function fetchEuropePMC(query: string): Promise<Article[]> {
         source: epmcSource(r.source ?? ""),
         citations: r.citedByCount ?? 0,
         is_oa: r.isOpenAccess === "Y",
-        doi: r.doi ?? "",
+        doi: cleanDoi(r.doi),
         abstract: r.abstractText ?? "",
         ...studyTypeProps(r.pubType ?? ""),
         url: r.doi ? `https://doi.org/${r.doi}` : undefined,
@@ -508,7 +529,7 @@ async function fetchEuropePMCPT(query: string): Promise<Article[]> {
         source: epmcSource(r.source ?? ""),
         citations: r.citedByCount ?? 0,
         is_oa: r.isOpenAccess === "Y",
-        doi: r.doi ?? "",
+        doi: cleanDoi(r.doi),
         abstract: r.abstractText ?? "",
         ...studyTypeProps(r.pubType ?? ""),
         url: r.doi ? `https://doi.org/${r.doi}` : undefined,
@@ -587,7 +608,7 @@ async function fetchPubMed(query: string): Promise<Article[]> {
         .filter(Boolean)
         .join(", ");
       const year = item.pubdate ? parseInt(item.pubdate.slice(0, 4)) : null;
-      const doi = (item.elocationid ?? "").replace("doi: ", "").trim();
+      const doi = cleanDoi(item.elocationid);
       const pubTypes: string = (item.pubtype ?? []).join(" ").toLowerCase();
       return buildArticle({
         title: item.title,
@@ -660,7 +681,7 @@ async function fetchPubMedPT(query: string): Promise<Article[]> {
         .filter(Boolean)
         .join(", ");
       const year = item.pubdate ? parseInt(item.pubdate.slice(0, 4)) : null;
-      const doi = (item.elocationid ?? "").replace("doi: ", "").trim();
+      const doi = cleanDoi(item.elocationid);
       const pubTypes: string = (item.pubtype ?? []).join(" ").toLowerCase();
       return buildArticle({
         title: item.title,
@@ -704,7 +725,7 @@ async function fetchDOAJ(query: string): Promise<Article[]> {
         .join(", ");
       const year = bib.year ? parseInt(bib.year) : null;
       const journal = bib.journal?.title ?? "DOAJ";
-      const doi = (bib.identifier ?? []).find((i: any) => i.type === "doi")?.id ?? "";
+      const doi = cleanDoi((bib.identifier ?? []).find((i: any) => i.type === "doi")?.id);
       return buildArticle({
         title,
         authors: authors || "Autores não disponíveis",
@@ -738,7 +759,7 @@ async function fetchSemanticScholar(query: string): Promise<Article[]> {
   return (data.data ?? [])
     .filter((p) => p.title)
     .map((p) => {
-      const doi = p.externalIds?.DOI ?? "";
+      const doi = cleanDoi(p.externalIds?.DOI);
       const authors = truncateAuthors(
         (p.authors ?? []).map((a: any) => a.name).filter(Boolean).join(", ")
       );
@@ -785,7 +806,7 @@ async function fetchSemanticScholarPsych(query: string): Promise<Article[]> {
   return (data.data ?? [])
     .filter((p) => p.title)
     .map((p) => {
-      const doi = p.externalIds?.DOI ?? "";
+      const doi = cleanDoi(p.externalIds?.DOI);
       const authors = truncateAuthors(
         (p.authors ?? []).map((a: any) => a.name).filter(Boolean).join(", ")
       );
@@ -843,7 +864,7 @@ async function fetchPsyArXiv(query: string): Promise<Article[]> {
     .filter((p) => p.attributes?.title)
     .map((p) => {
       const attr = p.attributes ?? {};
-      const doi = attr.doi ?? "";
+      const doi = cleanDoi(attr.doi);
       const year = attr.date_published
         ? parseInt(attr.date_published.slice(0, 4))
         : null;
@@ -1038,7 +1059,7 @@ async function fetchCORE(query: string): Promise<Article[]> {
   return (data.results ?? [])
     .filter((r) => r.title)
     .map((r) => {
-      const doi = r.doi ?? "";
+      const doi = cleanDoi(r.doi);
       const authors = (r.authors ?? [])
         .slice(0, 3)
         .map((a: any) => a.name ?? "")
@@ -1085,7 +1106,7 @@ async function fetchLensOrg(query: string): Promise<Article[]> {
   return (data.data ?? [])
     .filter((r) => r.title)
     .map((r) => {
-      const doi = (r.external_ids ?? []).find((e: any) => e.type === "doi")?.value ?? "";
+      const doi = cleanDoi((r.external_ids ?? []).find((e: any) => e.type === "doi")?.value);
       const authors = (r.authors ?? [])
         .slice(0, 3)
         .map((a: any) => `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim())
